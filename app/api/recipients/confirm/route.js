@@ -35,7 +35,7 @@ export async function POST(request) {
   }
 
   await db.run(
-    'INSERT OR REPLACE INTO confirmed_recipients (reader_name, confirmed_at) VALUES (?, ?)',
+    'INSERT INTO confirmed_recipients (reader_name, confirmed_at) VALUES (?, ?) ON DUPLICATE KEY UPDATE confirmed_at = VALUES(confirmed_at)',
     recipient.reader_name,
     new Date().toISOString(),
   );
