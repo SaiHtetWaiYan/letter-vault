@@ -150,7 +150,7 @@ export default function BlogDashboard({
             <div>
               <h3 className="text-lg font-serif">Letter sections</h3>
               <p className="text-xs text-[var(--parchment-40)] mt-0.5">
-                Each section unlocks once every assigned keyholder has confirmed.
+                All sections unlock once every trusted keyholder has confirmed.
               </p>
             </div>
             <button
