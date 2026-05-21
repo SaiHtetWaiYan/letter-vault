@@ -172,15 +172,20 @@ export default function App() {
 
   async function registerWriter(writerData) {
     try {
-      const newWriter = await apiRequest('/writers/register', {
+      const result = await apiRequest('/writers/register', {
         method: 'POST',
         body: JSON.stringify(writerData),
       });
-      setCurrentWriter(newWriter);
+      // Registration now returns { pending: true, email } — email verification required
+      if (result.pending) {
+        return { pending: true, email: result.email };
+      }
+      // Fallback if server ever returns writer directly
+      setCurrentWriter(result);
       setReaderSession(null);
-      await loadWriterData(newWriter.id);
+      await loadWriterData(result.id);
       setPage('writer-dashboard');
-      saveSession({ type: 'writer', writer: newWriter, page: 'writer-dashboard' });
+      saveSession({ type: 'writer', writer: result, page: 'writer-dashboard' });
       return '';
     } catch (error) {
       return error.message;
@@ -200,6 +205,10 @@ export default function App() {
       saveSession({ type: 'writer', writer: foundWriter, page: 'writer-dashboard' });
       return '';
     } catch (error) {
+      // Surface unverified flag so AuthPage can show resend UI
+      if (error.message?.includes('verify your email')) {
+        return { unverified: true, message: error.message };
+      }
       return error.message;
     }
   }

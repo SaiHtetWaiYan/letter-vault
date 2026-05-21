@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import Logo from './Logo.jsx';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/api';
+
 function getReaderPasscodeCount(readers, readerName) {
   const match = readers.find(
     (r) => r.readerName.toLowerCase() === readerName.trim().toLowerCase(),
@@ -17,6 +19,9 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
   const [readerPasscode, setReaderPasscode] = useState('');
   const [confirmedPasscodes, setConfirmedPasscodes] = useState([]);
   const [error, setError] = useState('');
+  const [pendingEmail, setPendingEmail] = useState(null); // set after registration, shows "check inbox"
+  const [resendStatus, setResendStatus] = useState(''); // 'sent' | 'sending' | ''
+  const [unverifiedEmail, setUnverifiedEmail] = useState(null); // set when login blocked due to unverified
 
   const requiredCount = useMemo(
     () => getReaderPasscodeCount(readers, readerName),
@@ -28,19 +33,43 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
   function changeMode(nextMode) {
     setMode(nextMode);
     setError('');
+    setUnverifiedEmail(null);
+    setResendStatus('');
   }
 
   async function handleWriterSubmit(event) {
     event.preventDefault();
+    setUnverifiedEmail(null);
     if (!email.trim() || !password.trim() || (mode === 'writer-register' && !name.trim())) {
       setError('Please complete all required fields.');
       return;
     }
-    const message =
-      mode === 'writer-register'
-        ? await onRegisterWriter({ name: name.trim(), email: email.trim(), password: password.trim() })
-        : await onLoginWriter({ email: email.trim(), password: password.trim() });
-    setError(message);
+    if (mode === 'writer-register') {
+      const result = await onRegisterWriter({ name: name.trim(), email: email.trim(), password: password.trim() });
+      if (result?.pending) {
+        setPendingEmail(result.email);
+      } else {
+        setError(result || '');
+      }
+    } else {
+      const result = await onLoginWriter({ email: email.trim(), password: password.trim() });
+      if (result?.unverified) {
+        setUnverifiedEmail(email.trim());
+        setError('');
+      } else {
+        setError(result || '');
+      }
+    }
+  }
+
+  async function handleResend(emailToResend) {
+    setResendStatus('sending');
+    await fetch(`${API_BASE}/writers/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: emailToResend }),
+    });
+    setResendStatus('sent');
   }
 
   async function confirmReaderPasscode(event) {
@@ -162,6 +191,44 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
         {/* ── Right: Form panel ─────────────────────────── */}
         <section className="flex items-center justify-center bg-[rgba(7,9,14,0.6)] p-6 sm:p-12">
           <div className="w-full max-w-[380px] space-y-7">
+
+            {/* Check-inbox screen shown after successful registration */}
+            {pendingEmail ? (
+              <div className="text-center space-y-6 page-enter">
+                <div className="seal-mark seal-mark-xl mx-auto" style={{ background: 'rgba(232,168,76,0.08)', borderColor: 'rgba(232,168,76,0.25)' }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                  </svg>
+                </div>
+                <div className="space-y-2">
+                  <p className="eyebrow text-[0.6rem]">One more step</p>
+                  <h2 className="text-2xl font-serif text-[var(--parchment)]">Check your inbox</h2>
+                  <p className="text-sm text-[var(--parchment-40)] leading-relaxed">
+                    We sent a verification link to<br/>
+                    <span className="text-[var(--amber)] font-medium">{pendingEmail}</span>
+                  </p>
+                  <p className="text-xs text-[var(--parchment-40)] leading-relaxed pt-1">
+                    Click the link in the email to activate your account, then sign in.
+                  </p>
+                </div>
+                <div className="space-y-3 pt-2">
+                  <button
+                    onClick={() => { setPendingEmail(null); setMode('writer-login'); setEmail(pendingEmail); setResendStatus(''); }}
+                    className="letter-btn-primary w-full px-4 py-3 text-sm"
+                  >
+                    Go to sign in →
+                  </button>
+                  <button
+                    onClick={() => handleResend(pendingEmail)}
+                    disabled={resendStatus === 'sending' || resendStatus === 'sent'}
+                    className="btn-flat w-full text-xs py-2 disabled:opacity-40"
+                  >
+                    {resendStatus === 'sent' ? '✓ Verification email resent' : resendStatus === 'sending' ? 'Sending…' : 'Resend verification email'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+            <>
             {/* Tab switcher */}
             <div className="auth-tabs">
               {tabs.map(({ value, label }) => (
@@ -289,6 +356,24 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
 
                 {error && <ErrorBanner>{error}</ErrorBanner>}
 
+                {/* Unverified account warning with resend button */}
+                {unverifiedEmail && !error && (
+                  <div className="rounded-lg border border-[rgba(232,168,76,0.2)] bg-[rgba(232,168,76,0.05)] px-4 py-3 space-y-2">
+                    <p className="text-xs font-semibold text-[var(--amber)]">Email not yet verified</p>
+                    <p className="text-xs text-[var(--parchment-40)] leading-relaxed">
+                      Check your inbox for the verification link, or resend it below.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleResend(unverifiedEmail)}
+                      disabled={resendStatus === 'sending' || resendStatus === 'sent'}
+                      className="text-xs text-[var(--amber)] underline underline-offset-2 disabled:opacity-40"
+                    >
+                      {resendStatus === 'sent' ? '✓ Sent — check your inbox' : resendStatus === 'sending' ? 'Sending…' : 'Resend verification email'}
+                    </button>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   className="letter-btn-primary w-full px-4 py-3 text-sm"
@@ -296,6 +381,8 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
                   {mode === 'writer-register' ? 'Create account →' : 'Sign in →'}
                 </button>
               </form>
+            )}
+            </>
             )}
           </div>
         </section>

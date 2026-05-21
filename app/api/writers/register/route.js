@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createId, getDb, bcrypt, SALT_ROUNDS } from '../../../../lib/db.js';
+import { createId, getDb, bcrypt, SALT_ROUNDS, createVerificationToken } from '../../../../lib/db.js';
+import { sendEmail, buildVerificationEmail } from '../../../../lib/email.js';
 
 export async function POST(request) {
   const db = await getDb();
@@ -17,10 +18,16 @@ export async function POST(request) {
     const id = createId();
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     await db.run(
-      'INSERT INTO writers (id, name, email, password) VALUES (?, ?, ?, ?)',
+      'INSERT INTO writers (id, name, email, password, email_verified) VALUES (?, ?, ?, ?, 0)',
       id, name, email, hashedPassword,
     );
-    return NextResponse.json({ id, name, email }, { status: 201 });
+
+    // Generate token and send verification email
+    const token = await createVerificationToken(id);
+    const { subject, html } = buildVerificationEmail({ writerName: name, verificationToken: token });
+    await sendEmail({ to: email, subject, html });
+
+    return NextResponse.json({ pending: true, email }, { status: 201 });
   } catch {
     return NextResponse.json(
       { message: 'A will creator account with this email already exists.' },
