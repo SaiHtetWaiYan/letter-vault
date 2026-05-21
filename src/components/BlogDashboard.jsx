@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import AttachmentPlayer from './AttachmentPlayer.jsx';
 import StatusBadge from './StatusBadge.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import Logo from './Logo.jsx';
@@ -92,9 +93,16 @@ export default function BlogDashboard({
           {selectedPost.attachments?.length > 0 && (
             <div className="mt-12 pt-8 border-t border-[rgba(232,168,76,0.1)]">
               <p className="eyebrow text-[0.6rem] mb-4">Secured attachments</p>
-              <div className="grid gap-2.5 sm:grid-cols-2">
+              <div className="grid gap-3">
                 {selectedPost.attachments.map((file, idx) => (
-                  <AttachmentRow key={idx} file={file} />
+                  <AttachmentPlayer key={idx} file={file} onDownload={(f) => {
+                    const link = document.createElement('a');
+                    link.href = f.data;
+                    link.download = f.name;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }} />
                 ))}
               </div>
             </div>

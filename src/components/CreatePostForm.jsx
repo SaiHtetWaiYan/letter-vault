@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import WysiwygEditor from './WysiwygEditor.jsx';
 import DatePicker from './DatePicker.jsx';
+import VoiceVideoRecorder from './VoiceVideoRecorder.jsx';
 
 function inferReleaseMode(post) {
   if (!post) return 'global';
@@ -221,9 +222,14 @@ export default function CreatePostForm({ readers, onSave, onCancel, post }) {
           <div>
             <p className="eyebrow-dim">Secure attachments</p>
             <p className="text-xs text-[var(--parchment-40)] mt-1">
-              Files are stored with the section and downloadable only after unlock.
+              Files and recordings are stored encrypted and accessible only after unlock.
             </p>
           </div>
+
+          {/* Voice / video recorder */}
+          <VoiceVideoRecorder
+            onAdd={(recording) => setAttachments((curr) => [...curr, recording])}
+          />
 
           <label className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[rgba(232,168,76,0.15)] bg-[var(--ink-2)] p-7 hover:border-[rgba(232,168,76,0.3)] transition cursor-pointer">
             <span className="text-2xl">📎</span>
@@ -235,23 +241,29 @@ export default function CreatePostForm({ readers, onSave, onCancel, post }) {
           {attachments.length > 0 && (
             <div className="space-y-2">
               {attachments.map((file, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-[rgba(232,168,76,0.1)] bg-[var(--ink-2)] p-3"
-                >
-                  <div className="truncate min-w-0">
-                    <p className="text-xs font-semibold text-[var(--parchment)] truncate">{file.name}</p>
-                    <p className="text-[10px] text-[var(--parchment-40)]">
-                      {(file.size / 1024).toFixed(1)} KB
-                    </p>
+                <div key={idx} className="rounded-lg border border-[rgba(232,168,76,0.1)] bg-[var(--ink-2)] p-3 space-y-2">
+                  {file.type?.startsWith('audio/') && (
+                    <audio controls src={file.data} className="w-full h-9" style={{ accentColor: 'var(--amber)' }} />
+                  )}
+                  {file.type?.startsWith('video/') && (
+                    <video controls src={file.data} className="w-full rounded-lg max-h-40 bg-black" />
+                  )}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="truncate min-w-0">
+                      <p className="text-xs font-semibold text-[var(--parchment)] truncate">
+                        {file.type?.startsWith('audio/') ? '🎙 ' : file.type?.startsWith('video/') ? '🎬 ' : '📎 '}
+                        {file.name}
+                      </p>
+                      <p className="text-[10px] text-[var(--parchment-40)]">{(file.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(idx)}
+                      className="letter-btn-danger px-3 py-1.5 text-xs font-bold flex-shrink-0"
+                    >
+                      Remove
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(idx)}
-                    className="letter-btn-danger px-3 py-1.5 text-xs font-bold flex-shrink-0"
-                  >
-                    Remove
-                  </button>
                 </div>
               ))}
             </div>

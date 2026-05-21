@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import StatusBadge from './StatusBadge';
 import Logo from './Logo.jsx';
+import AttachmentPlayer from './AttachmentPlayer.jsx';
 
 function stripHtml(html) {
   if (!html) return '';
@@ -78,24 +79,9 @@ export default function ReaderPortal({ readerName, posts, confirmedReaders, trus
                 {selectedPost.attachments?.length > 0 && (
                   <div className="pt-8 border-t border-[rgba(232,168,76,0.1)]">
                     <p className="eyebrow text-[0.6rem] mb-4">Secured attachments</p>
-                    <div className="grid gap-2.5 sm:grid-cols-2">
+                    <div className="grid gap-3">
                       {selectedPost.attachments.map((file, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between gap-3 rounded-lg border border-[rgba(232,168,76,0.1)] bg-[var(--ink-2)] p-3.5 text-xs"
-                        >
-                          <span className="text-[var(--parchment-70)] font-medium truncate">
-                            {file.name}&nbsp;
-                            <span className="text-[var(--parchment-40)]">({(file.size / 1024).toFixed(1)} KB)</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleDownload(file)}
-                            className="btn-amber"
-                          >
-                            Download
-                          </button>
-                        </div>
+                        <AttachmentPlayer key={idx} file={file} onDownload={handleDownload} />
                       ))}
                     </div>
                   </div>
