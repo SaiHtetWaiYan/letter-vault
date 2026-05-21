@@ -119,7 +119,7 @@ export default function DatePicker({ value, onChange, min }) {
       <button
         type="button"
         onClick={() => { setOpen(o => !o); setPickingYear(false); }}
-        className={`vault-input w-full px-4 py-3 text-sm text-left flex items-center justify-between gap-3 transition-all ${
+        className={`vault-input w-full pl-4 pr-10 py-3 text-sm text-left relative transition-all ${
           open ? 'border-[rgba(232,168,76,0.5)]' : ''
         }`}
       >
@@ -128,7 +128,7 @@ export default function DatePicker({ value, onChange, min }) {
         </span>
         <svg
           width="16" height="16" viewBox="0 0 16 16" fill="none"
-          className={`flex-shrink-0 opacity-50 transition-transform ${open ? 'rotate-180' : ''}`}
+          className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 pointer-events-none"
         >
           <rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.2"/>
           <path d="M5 1v4M11 1v4M1 7h14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
