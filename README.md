@@ -22,20 +22,23 @@ Every section can carry text, photos, voice recordings, and video messages. Beca
 
 ## Screenshots
 
-### Auth Page
+### Auth — Recipient Access
 ![Auth Page](docs/screenshots/01-auth.png)
 
-### Creator Sign In
+### Auth — Creator Sign In
 ![Creator Sign In](docs/screenshots/02-auth-signin.png)
 
-### Writer Dashboard
+### Creator Dashboard — Sections
 ![Writer Dashboard](docs/screenshots/03-dashboard.png)
 
-### Recipients & Keys
+### Creator Dashboard — Recipients
 ![Recipients](docs/screenshots/04-recipients.png)
 
+### New Section — Media & Attachments
+![New Section Form](docs/screenshots/05-new-section.png)
+
 ### Reader Portal
-![Reader Portal](docs/screenshots/05-reader-portal.png)
+![Reader Portal](docs/screenshots/06-reader-portal.png)
 
 ---
 
