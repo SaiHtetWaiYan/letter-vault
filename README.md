@@ -1,6 +1,20 @@
 # Letter Vault
 
-A private posthumous letter system. Write sealed letter sections, assign trusted keyholders, and keep the contents locked until the right people confirm — or until you're no longer here to stop it.
+There are things we mean to say but never find the right moment for. Things we'd only want someone to read after we're gone. Words we'd write differently if we knew they were final.
+
+**Letter Vault** is a private posthumous letter system built for that purpose.
+
+You write sealed letter sections — personal messages, final wishes, things you've been meaning to say. You assign each section to the people who should read it. Then you lock it, and trust that it will reach them when the time comes.
+
+The vault stays sealed for as long as you're alive and checking in. If you stop — the system notices. It sends a warning. If you don't respond, the letters are delivered. Quietly. To the right people. With their names and their passcodes, just as you set them up.
+
+Unlike simple "send after death" services, Letter Vault uses a **multi-keyholder confirmation system**: trusted people in your life must confirm with a passcode before the vault opens. You decide how many — all of them, or just a majority. If one keyholder dies or goes missing, the others can still unlock. No single point of failure.
+
+You can also schedule individual sections for specific dates — a letter that opens on a child's 18th birthday, one that arrives on a wedding anniversary five years from now, one that delivers the moment the vault opens and another that follows a year later.
+
+Every section can carry text, photos, voice recordings, and video messages. Because last words deserve more than a paragraph of plain text.
+
+**Letter Vault is self-hosted and open source.** Your letters never pass through a third-party service. The content is encrypted at rest. You own the keys.
 
 **Live:** https://letter-vault.saihtet.dev
 
