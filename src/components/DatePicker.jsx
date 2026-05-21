@@ -119,16 +119,30 @@ export default function DatePicker({ value, onChange, min }) {
       <button
         type="button"
         onClick={() => { setOpen(o => !o); setPickingYear(false); }}
-        className={`vault-input w-full pl-4 pr-10 py-3 text-sm text-left relative transition-all ${
-          open ? 'border-[rgba(232,168,76,0.5)]' : ''
-        }`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          background: 'rgba(6,8,13,0.7)',
+          border: `1px solid ${open ? 'rgba(232,168,76,0.5)' : 'rgba(232,168,76,0.16)'}`,
+          borderRadius: '7px',
+          padding: '12px 16px',
+          cursor: 'pointer',
+          transition: 'border-color 0.2s ease',
+          fontFamily: 'inherit',
+          fontSize: '0.875rem',
+          textAlign: 'left',
+          color: 'inherit',
+          gap: '8px',
+        }}
       >
-        <span className={displayValue ? 'text-[var(--parchment)]' : 'text-[var(--parchment-40)]'}>
+        <span style={{ color: displayValue ? 'var(--parchment)' : 'var(--parchment-40)', flex: 1 }}>
           {displayValue || 'Select a date'}
         </span>
         <svg
           width="16" height="16" viewBox="0 0 16 16" fill="none"
-          className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 pointer-events-none"
+          style={{ flexShrink: 0, opacity: 0.5, color: 'var(--parchment)' }}
         >
           <rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.2"/>
           <path d="M5 1v4M11 1v4M1 7h14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
