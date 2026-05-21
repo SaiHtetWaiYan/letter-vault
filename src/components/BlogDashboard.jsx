@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import AttachmentPlayer from './AttachmentPlayer.jsx';
+import PhotoGallery from './PhotoGallery.jsx';
+import SectionPreviewModal from './SectionPreviewModal.jsx';
 import StatusBadge from './StatusBadge.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import Logo from './Logo.jsx';
@@ -10,6 +12,7 @@ function stripHtml(html) {
 }
 
 export default function BlogDashboard({
+  writer,
   posts,
   readers,
   confirmedReaders = [],
@@ -29,6 +32,7 @@ export default function BlogDashboard({
 }) {
   const [activeTab, setActiveTab] = useState('sections');
   const [selectedPost, setSelectedPost] = useState(null);
+  const [previewPost, setPreviewPost] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // { type: 'post'|'reader', id, name }
 
   const totalPasscodes = readers.reduce((t, r) => t + r.passcodes.length, 0);
@@ -64,12 +68,20 @@ export default function BlogDashboard({
           >
             ← Back to sections
           </button>
-          <button
-            onClick={() => onEditPost(selectedPost)}
-            className="letter-btn-primary px-5 py-2 text-sm"
-          >
-            Edit section
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPreviewPost(selectedPost)}
+              className="btn-flat px-4 py-2 text-sm"
+            >
+              👁 Preview
+            </button>
+            <button
+              onClick={() => onEditPost(selectedPost)}
+              className="letter-btn-primary px-5 py-2 text-sm"
+            >
+              Edit section
+            </button>
+          </div>
         </div>
 
         <article className="letter-card p-8 md:p-12">
@@ -90,23 +102,35 @@ export default function BlogDashboard({
             dangerouslySetInnerHTML={{ __html: selectedPost.text }}
           />
 
-          {selectedPost.attachments?.length > 0 && (
-            <div className="mt-12 pt-8 border-t border-[rgba(232,168,76,0.1)]">
-              <p className="eyebrow text-[0.6rem] mb-4">Secured attachments</p>
-              <div className="grid gap-3">
-                {selectedPost.attachments.map((file, idx) => (
-                  <AttachmentPlayer key={idx} file={file} onDownload={(f) => {
-                    const link = document.createElement('a');
-                    link.href = f.data;
-                    link.download = f.name;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                  }} />
-                ))}
+          {selectedPost.attachments?.length > 0 && (() => {
+            const photos = selectedPost.attachments.filter(f => f.type?.startsWith('image/'));
+            const others = selectedPost.attachments.filter(f => !f.type?.startsWith('image/'));
+            function download(f) {
+              const link = document.createElement('a');
+              link.href = f.data; link.download = f.name;
+              document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            }
+            return (
+              <div className="mt-12 pt-8 border-t border-[rgba(232,168,76,0.1)] space-y-5">
+                {photos.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="eyebrow text-[0.6rem]">Photos</p>
+                    <PhotoGallery photos={photos} />
+                  </div>
+                )}
+                {others.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="eyebrow text-[0.6rem]">Attachments</p>
+                    <div className="grid gap-3">
+                      {others.map((file, idx) => (
+                        <AttachmentPlayer key={idx} file={file} onDownload={download} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
         </article>
       </div>
     );
@@ -222,6 +246,7 @@ export default function BlogDashboard({
                   isReadable={isSectionReadable(post)}
                   badge={releaseBadge(post)}
                   onSelect={() => setSelectedPost(post)}
+                  onPreview={() => setPreviewPost(post)}
                   onDelete={() => setConfirmDelete({ type: 'post', id: post.id, name: post.title })}
                 />
               ))}
@@ -264,6 +289,14 @@ export default function BlogDashboard({
         </div>
       )}
 
+      {previewPost && (
+        <SectionPreviewModal
+          post={previewPost}
+          writer={writer}
+          onClose={() => setPreviewPost(null)}
+        />
+      )}
+
       {confirmDelete && (
         <ConfirmModal
           title={`Delete ${confirmDelete.type === 'post' ? 'section' : 'recipient'}?`}
@@ -280,7 +313,7 @@ export default function BlogDashboard({
   );
 }
 
-function SectionCard({ post, isReadable, badge, onSelect, onDelete }) {
+function SectionCard({ post, isReadable, badge, onSelect, onPreview, onDelete }) {
   return (
     <article
       className={`letter-card flex flex-col justify-between group ${
@@ -310,15 +343,24 @@ function SectionCard({ post, isReadable, badge, onSelect, onDelete }) {
         </p>
       </div>
 
-      <div className="px-6 pb-4 pt-3 border-t border-[rgba(232,168,76,0.08)] flex items-center justify-between">
+      <div className="px-6 pb-4 pt-3 border-t border-[rgba(232,168,76,0.08)] flex items-center justify-between gap-2">
         <span className="text-[10px] font-mono text-[var(--parchment-40)]">{post.createdAt}</span>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="btn-flat-danger text-xs px-2 py-1"
-          title="Delete section"
-        >
-          Delete
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={(e) => { e.stopPropagation(); onPreview(); }}
+            className="btn-flat text-xs px-2 py-1"
+            title="Preview as recipient"
+          >
+            👁
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="btn-flat-danger text-xs px-2 py-1"
+            title="Delete section"
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </article>
   );

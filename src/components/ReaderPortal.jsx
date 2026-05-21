@@ -2,6 +2,7 @@ import { useState } from 'react';
 import StatusBadge from './StatusBadge';
 import Logo from './Logo.jsx';
 import AttachmentPlayer from './AttachmentPlayer.jsx';
+import PhotoGallery from './PhotoGallery.jsx';
 
 function stripHtml(html) {
   if (!html) return '';
@@ -76,16 +77,30 @@ export default function ReaderPortal({ readerName, posts, confirmedReaders, trus
                   className="text-[var(--parchment-70)] leading-[1.85] font-serif text-lg wysiwyg-output"
                   dangerouslySetInnerHTML={{ __html: selectedPost.text }}
                 />
-                {selectedPost.attachments?.length > 0 && (
-                  <div className="pt-8 border-t border-[rgba(232,168,76,0.1)]">
-                    <p className="eyebrow text-[0.6rem] mb-4">Secured attachments</p>
-                    <div className="grid gap-3">
-                      {selectedPost.attachments.map((file, idx) => (
-                        <AttachmentPlayer key={idx} file={file} onDownload={handleDownload} />
-                      ))}
+                {selectedPost.attachments?.length > 0 && (() => {
+                  const photos = selectedPost.attachments.filter(f => f.type?.startsWith('image/'));
+                  const others = selectedPost.attachments.filter(f => !f.type?.startsWith('image/'));
+                  return (
+                    <div className="pt-8 border-t border-[rgba(232,168,76,0.1)] space-y-5">
+                      {photos.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="eyebrow text-[0.6rem]">Photos</p>
+                          <PhotoGallery photos={photos} />
+                        </div>
+                      )}
+                      {others.length > 0 && (
+                        <div className="space-y-3">
+                          <p className="eyebrow text-[0.6rem]">Attachments</p>
+                          <div className="grid gap-3">
+                            {others.map((file, idx) => (
+                              <AttachmentPlayer key={idx} file={file} onDownload={handleDownload} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             ) : (
               <LockedMessage />
