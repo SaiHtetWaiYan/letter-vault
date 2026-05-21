@@ -217,57 +217,97 @@ export default function CreatePostForm({ readers, onSave, onCancel, post }) {
           />
         </div>
 
-        {/* Attachments */}
-        <div className="space-y-3 pt-1 border-t border-[rgba(232,168,76,0.1)]">
-          <div>
-            <p className="eyebrow-dim">Secure attachments</p>
-            <p className="text-xs text-[var(--parchment-40)] mt-1">
-              Files and recordings are stored encrypted and accessible only after unlock.
-            </p>
-          </div>
+        {/* ── Media & attachments ─────────────────────────────────────────── */}
+        <div className="space-y-6 pt-1 border-t border-[rgba(232,168,76,0.1)]">
+          <p className="eyebrow-dim">Media &amp; attachments</p>
 
-          {/* Voice / video recorder */}
-          <VoiceVideoRecorder
-            onAdd={(recording) => setAttachments((curr) => [...curr, recording])}
-          />
-
-          <label className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[rgba(232,168,76,0.15)] bg-[var(--ink-2)] p-7 hover:border-[rgba(232,168,76,0.3)] transition cursor-pointer">
-            <span className="text-2xl">📎</span>
-            <span className="text-sm font-semibold text-[var(--parchment-70)]">Click to upload files</span>
-            <span className="text-[11px] text-[var(--parchment-40)]">Any file type · up to 10 MB</span>
-            <input type="file" multiple onChange={handleFileChange} className="hidden" />
-          </label>
-
-          {attachments.length > 0 && (
-            <div className="space-y-2">
-              {attachments.map((file, idx) => (
-                <div key={idx} className="rounded-lg border border-[rgba(232,168,76,0.1)] bg-[var(--ink-2)] p-3 space-y-2">
-                  {file.type?.startsWith('audio/') && (
-                    <audio controls src={file.data} className="w-full h-9" style={{ accentColor: 'var(--amber)' }} />
-                  )}
-                  {file.type?.startsWith('video/') && (
-                    <video controls src={file.data} className="w-full rounded-lg max-h-40 bg-black" />
-                  )}
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="truncate min-w-0">
-                      <p className="text-xs font-semibold text-[var(--parchment)] truncate">
-                        {file.type?.startsWith('audio/') ? '🎙 ' : file.type?.startsWith('video/') ? '🎬 ' : '📎 '}
-                        {file.name}
-                      </p>
-                      <p className="text-[10px] text-[var(--parchment-40)]">{(file.size / 1024).toFixed(1)} KB</p>
-                    </div>
+          {/* Photos */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-[var(--parchment-70)]">Photos</p>
+            <label className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[rgba(232,168,76,0.15)] bg-[var(--ink-2)] p-6 hover:border-[rgba(232,168,76,0.3)] transition cursor-pointer">
+              <span className="text-2xl">🖼</span>
+              <span className="text-sm font-semibold text-[var(--parchment-70)]">Click to add photos</span>
+              <span className="text-[11px] text-[var(--parchment-40)]">JPG, PNG, GIF, WebP — shown as gallery after unlock</span>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
+            {/* Photo preview grid */}
+            {attachments.filter(f => f.type?.startsWith('image/')).length > 0 && (
+              <div className={`grid gap-2 ${
+                attachments.filter(f => f.type?.startsWith('image/')).length === 1 ? 'grid-cols-1' :
+                attachments.filter(f => f.type?.startsWith('image/')).length === 2 ? 'grid-cols-2' :
+                'grid-cols-3'
+              }`}>
+                {attachments.map((file, idx) => file.type?.startsWith('image/') && (
+                  <div key={idx} className="relative group rounded-lg overflow-hidden aspect-square bg-[var(--ink-2)]">
+                    <img src={file.data} alt={file.name} className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeAttachment(idx)}
-                      className="letter-btn-danger px-3 py-1.5 text-xs font-bold flex-shrink-0"
+                      className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center rounded-full bg-black/70 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                     >
-                      Remove
+                      ✕
                     </button>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Voice / Video */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-[var(--parchment-70)]">Voice or video message</p>
+            <VoiceVideoRecorder
+              onAdd={(recording) => setAttachments((curr) => [...curr, recording])}
+            />
+            {attachments.filter(f => f.type?.startsWith('audio/') || f.type?.startsWith('video/')).map((file, idx) => (
+              <div key={idx} className="rounded-lg border border-[rgba(232,168,76,0.1)] bg-[var(--ink-2)] p-3 space-y-2">
+                {file.type?.startsWith('audio/') && (
+                  <audio controls src={file.data} className="w-full h-9" style={{ accentColor: 'var(--amber)' }} />
+                )}
+                {file.type?.startsWith('video/') && (
+                  <video controls src={file.data} className="w-full rounded-lg max-h-40 bg-black" />
+                )}
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-[var(--parchment)] truncate">
+                    {file.type?.startsWith('audio/') ? '🎙 ' : '🎬 '}{file.name}
+                  </p>
+                  <button type="button" onClick={() => removeAttachment(attachments.indexOf(file))} className="letter-btn-danger px-3 py-1.5 text-xs font-bold flex-shrink-0">Remove</button>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
+
+          {/* Other files */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-[var(--parchment-70)]">Files</p>
+            <label className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[rgba(232,168,76,0.15)] bg-[var(--ink-2)] p-6 hover:border-[rgba(232,168,76,0.3)] transition cursor-pointer">
+              <span className="text-2xl">📎</span>
+              <span className="text-sm font-semibold text-[var(--parchment-70)]">Click to attach files</span>
+              <span className="text-[11px] text-[var(--parchment-40)]">PDF, DOC, and other documents</span>
+              <input
+                type="file"
+                multiple
+                accept="application/*,text/*,.pdf,.doc,.docx,.xls,.xlsx,.zip"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
+            {attachments.filter(f => !f.type?.startsWith('image/') && !f.type?.startsWith('audio/') && !f.type?.startsWith('video/')).map((file, idx) => (
+              <div key={idx} className="flex items-center justify-between gap-3 rounded-lg border border-[rgba(232,168,76,0.1)] bg-[var(--ink-2)] p-3">
+                <div className="truncate min-w-0">
+                  <p className="text-xs font-semibold text-[var(--parchment)] truncate">📎 {file.name}</p>
+                  <p className="text-[10px] text-[var(--parchment-40)]">{(file.size / 1024).toFixed(1)} KB</p>
+                </div>
+                <button type="button" onClick={() => removeAttachment(attachments.indexOf(file))} className="letter-btn-danger px-3 py-1.5 text-xs font-bold flex-shrink-0">Remove</button>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
