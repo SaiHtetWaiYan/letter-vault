@@ -16,6 +16,23 @@ export default function ReaderPortal({ readerName, posts, confirmedReaders, trus
   const threshold = unlockThreshold > 0 ? unlockThreshold : trustedReaders.length;
   const isVaultUnlocked = dmzUnlocked || (trustedReaders.length > 0 && confirmedTrustedCount >= threshold);
 
+  function isSectionReadable(section) {
+    if (isVaultUnlocked) return true;
+    if (section.releasedAt) return true;
+    if (section.releaseDate && new Date(section.releaseDate) <= new Date()) return true;
+    return false;
+  }
+
+  function sectionReleaseLabel(section) {
+    if (section.releaseDelayDays && !section.releaseDate) {
+      return `Opens ${section.releaseDelayDays} days after vault unlocks`;
+    }
+    if (section.releaseDate) {
+      return `Opens on ${new Date(section.releaseDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    }
+    return 'Sealed — awaiting keyholder confirmation';
+  }
+
   function handleDownload(file) {
     const link = document.createElement('a');
     link.href = file.data;
@@ -49,10 +66,10 @@ export default function ReaderPortal({ readerName, posts, confirmedReaders, trus
                 </h1>
                 <p className="text-xs text-[var(--parchment-40)]">{selectedPost.createdAt}</p>
               </div>
-              <StatusBadge label={isVaultUnlocked ? 'Unlocked' : 'Sealed'} tone={isVaultUnlocked ? 'green' : 'red'} />
+              <StatusBadge label={isSectionReadable(selectedPost) ? 'Unlocked' : 'Sealed'} tone={isSectionReadable(selectedPost) ? 'green' : 'red'} />
             </div>
 
-            {isVaultUnlocked ? (
+            {isSectionReadable(selectedPost) ? (
               <div className="space-y-6">
                 <div
                   className="text-[var(--parchment-70)] leading-[1.85] font-serif text-lg wysiwyg-output"
@@ -135,7 +152,8 @@ export default function ReaderPortal({ readerName, posts, confirmedReaders, trus
               <ReaderSectionCard
                 key={post.id}
                 post={post}
-                isVaultUnlocked={isVaultUnlocked}
+                isReadable={isSectionReadable(post)}
+                releaseLabel={sectionReleaseLabel(post)}
                 onSelect={() => setSelectedPost(post)}
               />
             ))}
@@ -179,11 +197,11 @@ function SiteHeader({ readerName, onLogout, left }) {
   );
 }
 
-function ReaderSectionCard({ post, isVaultUnlocked, onSelect }) {
+function ReaderSectionCard({ post, isReadable, releaseLabel, onSelect }) {
   return (
     <article
       className={`letter-card flex flex-col justify-between cursor-pointer group ${
-        isVaultUnlocked ? 'letter-card-unlocked' : 'letter-card-locked'
+        isReadable ? 'letter-card-unlocked' : 'letter-card-locked'
       }`}
       onClick={onSelect}
     >
@@ -192,10 +210,10 @@ function ReaderSectionCard({ post, isVaultUnlocked, onSelect }) {
           <h2 className="text-lg font-serif group-hover:text-[var(--amber)] transition-colors">
             {post.title}
           </h2>
-          <StatusBadge label={isVaultUnlocked ? 'Open' : 'Sealed'} tone={isVaultUnlocked ? 'green' : 'red'} />
+          <StatusBadge label={isReadable ? 'Open' : 'Sealed'} tone={isReadable ? 'green' : 'red'} />
         </div>
 
-        {isVaultUnlocked ? (
+        {isReadable ? (
           <p className="text-sm text-[var(--parchment-70)] font-serif leading-relaxed line-clamp-3">
             {stripHtml(post.text).substring(0, 130)}…
           </p>
@@ -205,7 +223,7 @@ function ReaderSectionCard({ post, isVaultUnlocked, onSelect }) {
               <rect x="0.75" y="5.75" width="9.5" height="7.5" rx="1.25" stroke="rgba(232,168,76,0.9)" strokeWidth="1.1"/>
               <path d="M3 5.5V4a2.5 2.5 0 0 1 5 0v1.5" stroke="rgba(232,168,76,0.9)" strokeWidth="1.1" strokeLinecap="round"/>
             </svg>
-            <p className="text-xs text-[var(--parchment-40)]">Sealed — awaiting keyholder confirmation</p>
+            <p className="text-xs text-[var(--parchment-40)]">{releaseLabel}</p>
           </div>
         )}
       </div>
@@ -213,7 +231,7 @@ function ReaderSectionCard({ post, isVaultUnlocked, onSelect }) {
       <div className="px-6 pb-5 pt-3 border-t border-[rgba(232,168,76,0.08)] flex items-center justify-between">
         <span className="text-[10px] font-mono text-[var(--parchment-40)]">{post.createdAt}</span>
         <span className="text-[10px] text-[var(--amber)] font-semibold group-hover:underline">
-          {isVaultUnlocked ? 'Read →' : 'View status →'}
+          {isReadable ? 'Read →' : 'View status →'}
         </span>
       </div>
     </article>

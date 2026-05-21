@@ -4,14 +4,21 @@ import {
   markWarningSent,
   markDmzUnlocked,
   getWriterRecipients,
+  getSectionsToRelease,
+  markSectionReleased,
+  getSectionRecipients,
+  applyRelativeReleaseDates,
 } from '../../../../lib/db.js';
-import { sendEmail, buildWarningEmail, buildRecipientUnlockEmail } from '../../../../lib/email.js';
+import {
+  sendEmail,
+  buildWarningEmail,
+  buildRecipientUnlockEmail,
+  buildScheduledReleaseEmail,
+} from '../../../../lib/email.js';
 
-// Protect the endpoint with a shared secret so only your cron job can call it.
-// Set CRON_SECRET in .env and pass it as: Authorization: Bearer <secret>
 function isAuthorised(request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // no secret configured — open (dev only)
+  if (!secret) return true;
   const auth = request.headers.get('authorization') || '';
   return auth === `Bearer ${secret}`;
 }
@@ -22,9 +29,10 @@ export async function POST(request) {
   }
 
   const now = new Date();
-  const writers = await getDmsCheckList();
+  const results = { warned: [], unlocked: [], skipped: [], sectionsReleased: [] };
 
-  const results = { warned: [], unlocked: [], skipped: [] };
+  // ── 1. Dead-man's switch checks ───────────────────────────────────────────
+  const writers = await getDmsCheckList();
 
   for (const writer of writers) {
     const lastActive = writer.last_active_at ? new Date(writer.last_active_at) : null;
@@ -32,33 +40,29 @@ export async function POST(request) {
     const inactivityMs = writer.inactivity_days * 24 * 60 * 60 * 1000;
     const graceMs = writer.grace_days * 24 * 60 * 60 * 1000;
 
-    // If the creator has never logged in, skip (they haven't activated DMS yet)
-    if (!lastActive) {
-      results.skipped.push(writer.email);
-      continue;
-    }
+    if (!lastActive) { results.skipped.push(writer.email); continue; }
 
     const inactiveSince = now - lastActive;
 
-    // Phase 2: Warning already sent — check if grace period expired → auto-unlock
     if (warningSent) {
       const graceSince = now - warningSent;
       if (graceSince >= graceMs) {
         await markDmzUnlocked(writer.id);
 
-        // Notify all recipients that have an email address
+        // Set release dates for relative-delay sections using now as anchor
+        await applyRelativeReleaseDates(writer.id, now);
+
+        // Notify all recipients with emails
         const recipients = await getWriterRecipients(writer.id);
         await Promise.allSettled(
-          recipients
-            .filter((r) => r.email)
-            .map((r) => {
-              const { subject, html } = buildRecipientUnlockEmail({
-                writerName: writer.name,
-                readerName: r.readerName,
-                triggeredByDms: true,
-              });
-              return sendEmail({ to: r.email, subject, html });
-            }),
+          recipients.filter((r) => r.email).map((r) => {
+            const { subject, html } = buildRecipientUnlockEmail({
+              writerName: writer.name,
+              readerName: r.readerName,
+              triggeredByDms: true,
+            });
+            return sendEmail({ to: r.email, subject, html });
+          }),
         );
 
         results.unlocked.push(writer.email);
@@ -66,7 +70,6 @@ export async function POST(request) {
       continue;
     }
 
-    // Phase 1: No warning yet — check if inactivity period expired → send warning
     if (inactiveSince >= inactivityMs) {
       const { subject, html } = buildWarningEmail({
         writerName: writer.name,
@@ -79,6 +82,28 @@ export async function POST(request) {
     } else {
       results.skipped.push(writer.email);
     }
+  }
+
+  // ── 2. Scheduled section release checks ──────────────────────────────────
+  const sectionsToRelease = await getSectionsToRelease();
+
+  for (const section of sectionsToRelease) {
+    await markSectionReleased(section.id);
+
+    // Notify assigned recipients who have email addresses
+    const sectionRecipients = await getSectionRecipients(section.id);
+    await Promise.allSettled(
+      sectionRecipients.filter((r) => r.email).map((r) => {
+        const { subject, html } = buildScheduledReleaseEmail({
+          writerName: section.writer_name,
+          readerName: r.readerName,
+          sectionTitle: section.title,
+        });
+        return sendEmail({ to: r.email, subject, html });
+      }),
+    );
+
+    results.sectionsReleased.push({ id: section.id, title: section.title });
   }
 
   return NextResponse.json({ ok: true, ...results });

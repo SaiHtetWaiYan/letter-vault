@@ -4,7 +4,10 @@ import { createId, getDb, getWriterData, encrypt } from '../../../../../lib/db.j
 export async function POST(request, { params }) {
   const db = await getDb();
   const { writerId } = await params;
-  const { id, readerNames, title, summary, text, attachments } = await request.json();
+  const { id, readerNames, title, summary, text, attachments, releaseDate, releaseDelayDays } = await request.json();
+  // Normalise: only one of the two can be set
+  const relDate = releaseDate || null;
+  const relDelay = releaseDelayDays != null ? Math.max(1, Math.floor(Number(releaseDelayDays))) : null;
 
   if (!Array.isArray(readerNames) || readerNames.length === 0 || !title || !text) {
     return NextResponse.json(
@@ -28,11 +31,15 @@ export async function POST(request, { params }) {
     }
 
     await db.run(
-      'UPDATE will_sections SET title = ?, summary = ?, text = ?, attachments = ? WHERE id = ? AND writer_id = ?',
+      `UPDATE will_sections SET title = ?, summary = ?, text = ?, attachments = ?,
+        release_date = ?, release_delay_days = ?, released_at = NULL
+       WHERE id = ? AND writer_id = ?`,
       title,
       summary || '',
       encrypt(text),
       encrypt(JSON.stringify(attachments || [])),
+      relDate,
+      relDelay,
       id,
       writerId,
     );
@@ -50,7 +57,9 @@ export async function POST(request, { params }) {
     // Create new section
     const sectionId = createId();
     await db.run(
-      'INSERT INTO will_sections (id, writer_id, title, summary, text, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO will_sections
+        (id, writer_id, title, summary, text, attachments, created_at, release_date, release_delay_days)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       sectionId,
       writerId,
       title,
@@ -58,6 +67,8 @@ export async function POST(request, { params }) {
       encrypt(text),
       encrypt(JSON.stringify(attachments || [])),
       new Date().toISOString().slice(0, 10),
+      relDate,
+      relDelay,
     );
 
     for (const readerName of readerNames) {

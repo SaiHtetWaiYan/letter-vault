@@ -37,6 +37,21 @@ export default function BlogDashboard({
   const effectiveThreshold = unlockThreshold > 0 ? unlockThreshold : trustedReaders.length;
   const isVaultUnlocked = dmzUnlocked || (trustedReaders.length > 0 && confirmedTrustedCount >= effectiveThreshold);
 
+  function isSectionReadable(post) {
+    if (isVaultUnlocked) return true;
+    if (post.releasedAt) return true;
+    if (post.releaseDate && new Date(post.releaseDate) <= new Date()) return true;
+    return false;
+  }
+
+  function releaseBadge(post) {
+    if (post.releaseDelayDays && !post.releaseDate) return `+${post.releaseDelayDays}d after unlock`;
+    if (post.releaseDate) {
+      return new Date(post.releaseDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    return null;
+  }
+
   /* ── Single post view ─────────────────────── */
   if (selectedPost) {
     return (
@@ -66,7 +81,7 @@ export default function BlogDashboard({
                 <span className="text-[var(--parchment-70)]">{selectedPost.readerNames.join(', ')}</span>
               </p>
             </div>
-            <StatusBadge label={isVaultUnlocked ? 'Unlocked' : 'Sealed'} tone={isVaultUnlocked ? 'green' : 'red'} />
+            <StatusBadge label={isSectionReadable(selectedPost) ? 'Unlocked' : 'Sealed'} tone={isSectionReadable(selectedPost) ? 'green' : 'red'} />
           </div>
 
           <div
@@ -196,7 +211,8 @@ export default function BlogDashboard({
                 <SectionCard
                   key={post.id}
                   post={post}
-                  isVaultUnlocked={isVaultUnlocked}
+                  isReadable={isSectionReadable(post)}
+                  badge={releaseBadge(post)}
                   onSelect={() => setSelectedPost(post)}
                   onDelete={() => setConfirmDelete({ type: 'post', id: post.id, name: post.title })}
                 />
@@ -256,11 +272,11 @@ export default function BlogDashboard({
   );
 }
 
-function SectionCard({ post, isVaultUnlocked, onSelect, onDelete }) {
+function SectionCard({ post, isReadable, badge, onSelect, onDelete }) {
   return (
     <article
       className={`letter-card flex flex-col justify-between group ${
-        isVaultUnlocked ? 'letter-card-unlocked' : 'letter-card-locked'
+        isReadable ? 'letter-card-unlocked' : 'letter-card-locked'
       }`}
     >
       <div className="p-6 space-y-3 cursor-pointer" onClick={onSelect}>
@@ -268,8 +284,14 @@ function SectionCard({ post, isVaultUnlocked, onSelect, onDelete }) {
           <h4 className="text-base font-serif leading-snug group-hover:text-[var(--amber)] transition-colors">
             {post.title}
           </h4>
-          <StatusBadge label={isVaultUnlocked ? 'Open' : 'Sealed'} tone={isVaultUnlocked ? 'green' : 'red'} />
+          <StatusBadge label={isReadable ? 'Open' : 'Sealed'} tone={isReadable ? 'green' : 'red'} />
         </div>
+        {badge && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px]">📅</span>
+            <span className="text-[10px] text-[var(--amber)] font-mono">{badge}</span>
+          </div>
+        )}
 
         <p className="text-xs text-[var(--parchment-40)]">
           {post.readerNames.join(', ')}

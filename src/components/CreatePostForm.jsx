@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import WysiwygEditor from './WysiwygEditor.jsx';
 
+function inferReleaseMode(post) {
+  if (!post) return 'global';
+  if (post.releaseDelayDays) return 'delay';
+  if (post.releaseDate) return 'date';
+  return 'global';
+}
+
 export default function CreatePostForm({ readers, onSave, onCancel, post }) {
   const [selectedReaders, setSelectedReaders] = useState(
     post ? post.readerNames : readers[0] ? [readers[0].readerName] : [],
@@ -8,6 +15,9 @@ export default function CreatePostForm({ readers, onSave, onCancel, post }) {
   const [title, setTitle] = useState(post ? post.title : '');
   const [text, setText] = useState(post ? post.text : '');
   const [attachments, setAttachments] = useState(post ? post.attachments || [] : []);
+  const [releaseMode, setReleaseMode] = useState(inferReleaseMode(post));
+  const [releaseDate, setReleaseDate] = useState(post?.releaseDate || '');
+  const [releaseDelayDays, setReleaseDelayDays] = useState(post?.releaseDelayDays || 30);
   const [error, setError] = useState('');
 
   function toggleReader(readerName) {
@@ -50,6 +60,8 @@ export default function CreatePostForm({ readers, onSave, onCancel, post }) {
       summary: '',
       text: text.trim(),
       attachments,
+      releaseDate: releaseMode === 'date' ? releaseDate : null,
+      releaseDelayDays: releaseMode === 'delay' ? Number(releaseDelayDays) : null,
     });
   }
 
@@ -123,6 +135,76 @@ export default function CreatePostForm({ readers, onSave, onCancel, post }) {
             placeholder="e.g. Final wishes"
             className="vault-input px-4 py-3 text-sm outline-none"
           />
+        </div>
+
+        {/* Unlock condition */}
+        <div className="space-y-3">
+          <p className="eyebrow-dim">Unlock condition</p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {[
+              { value: 'global', label: 'Global unlock', desc: 'Readable when vault opens (keyholders or dead-man\'s switch)' },
+              { value: 'date',   label: 'Fixed date',    desc: 'Opens on a specific calendar date regardless of vault state' },
+              { value: 'delay',  label: 'After unlock',  desc: 'Opens N days after the dead-man\'s switch triggers' },
+            ].map(({ value, label, desc }) => (
+              <label
+                key={value}
+                className={`flex flex-col gap-1 rounded-lg border p-4 cursor-pointer transition-all ${
+                  releaseMode === value
+                    ? 'border-[var(--amber)] bg-[var(--amber-subtle)]'
+                    : 'border-[rgba(232,168,76,0.1)] bg-[var(--ink-2)] hover:border-[rgba(232,168,76,0.25)]'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="releaseMode"
+                    value={value}
+                    checked={releaseMode === value}
+                    onChange={() => setReleaseMode(value)}
+                    className="accent-[var(--amber)]"
+                  />
+                  <span className="text-sm font-semibold text-[var(--parchment)]">{label}</span>
+                </div>
+                <p className="text-[11px] text-[var(--parchment-40)] leading-relaxed pl-5">{desc}</p>
+              </label>
+            ))}
+          </div>
+
+          {releaseMode === 'date' && (
+            <div className="space-y-1.5">
+              <label className="eyebrow-dim">Release date</label>
+              <input
+                type="date"
+                value={releaseDate}
+                onChange={(e) => setReleaseDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 10)}
+                className="vault-input px-4 py-3 text-sm outline-none"
+              />
+              <p className="text-[11px] text-[var(--parchment-40)]">
+                This section will become readable on this date, even if the vault is still sealed.
+              </p>
+            </div>
+          )}
+
+          {releaseMode === 'delay' && (
+            <div className="space-y-1.5">
+              <label className="eyebrow-dim">Delay after dead-man's switch triggers</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={1}
+                  max={3650}
+                  value={releaseDelayDays}
+                  onChange={(e) => setReleaseDelayDays(e.target.value)}
+                  className="vault-input px-4 py-3 text-sm outline-none w-24"
+                />
+                <span className="text-sm text-[var(--parchment-70)]">days after unlock</span>
+              </div>
+              <p className="text-[11px] text-[var(--parchment-40)]">
+                e.g. 365 = opens ~1 year after your dead-man's switch fires. Good for anniversary letters.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Body */}
