@@ -1,6 +1,6 @@
 # Letter Vault
 
-A secure multi-passcode digital letter system. Write sealed letter sections, assign trusted keyholders, and keep the contents locked until every required recipient confirms with their passcode.
+A private posthumous letter system. Write sealed letter sections, assign trusted keyholders, and keep the contents locked until the right people confirm — or until you're no longer here to stop it.
 
 **Live:** https://letter-vault.saihtet.dev
 
@@ -33,34 +33,69 @@ A secure multi-passcode digital letter system. Write sealed letter sections, ass
 |---|---|
 | **Creator** | Registers an account, writes letter sections, and assigns recipients |
 | **Keyholder** | A trusted recipient whose passcode confirmation is required to unlock the vault |
-| **Beneficiary** | A recipient who reads assigned sections once all keyholders have confirmed |
+| **Beneficiary** | A recipient who reads assigned sections once the vault opens |
 
 ### Workflow
 
 ```
-Creator                    Keyholders                  Beneficiaries
-   │                           │                            │
-   ├─ Register account         │                            │
-   ├─ Add recipients           │                            │
-   │   ├─ alice (keyholder)    │                            │
-   │   ├─ bob   (keyholder)    │                            │
-   │   └─ sarah (beneficiary)  │                            │
-   ├─ Write letter sections    │                            │
-   └─ Assign recipients        │                            │
-                               │                            │
-                          alice confirms ──────────────────►│ (vault still sealed)
-                          bob confirms   ──────────────────►│
-                                                            │
-                                                     Vault unlocks globally
-                                                     All sections now readable
+Creator                    Keyholders                   Recipients
+   │                           │                             │
+   ├─ Register + verify email  │                             │
+   ├─ Add recipients           │                             │
+   │   ├─ alice (keyholder)    ◄── invitation email sent     │
+   │   ├─ bob   (keyholder)    ◄── invitation email sent     │
+   │   └─ sarah (beneficiary)  ◄── invitation email sent     │
+   ├─ Write letter sections    │                             │
+   │   ├─ global unlock        │                             │
+   │   ├─ fixed date           │                             │
+   │   └─ delay after unlock   │                             │
+   ├─ Set unlock threshold     │                             │
+   │   └─ e.g. 2 of 3          │                             │
+   └─ Configure dead-man's switch                            │
+                               │                             │
+                          alice confirms ───────────────────►│ (threshold not yet met)
+                          bob confirms   ───────────────────►│
+                                                             │
+                                               Vault unlocks (threshold met)
+                                               All recipients notified by email
+                                               Sections readable per their schedule
 ```
 
-1. **Creator** registers, adds recipients with passcodes, and writes sealed letter sections
-2. **Keyholders** visit the site, enter their name and passcode to confirm
-3. Once **all** trusted keyholders have confirmed, the vault unlocks globally
-4. **All recipients** (keyholders and beneficiaries) can now read their assigned sections
+#### Unlock paths
 
-> The vault is an all-or-nothing global unlock — every trusted keyholder must confirm before any section becomes readable.
+There are three ways the vault can open:
+
+1. **Keyholder confirmation (M-of-N)** — once the required number of keyholders confirm with their passcodes, the vault opens. The threshold is configurable (default: majority). If a keyholder dies or goes missing, the remaining keyholders can still unlock.
+
+2. **Dead-man's switch** — if the creator doesn't log in for N days, a warning email is sent. If there's no response within the grace period, the vault opens automatically. Clicking the "I'm still here" link in the warning email resets the timer.
+
+3. **Scheduled release date** — individual sections can be set to open on a specific date (e.g. a birthday, an anniversary) or N days after the dead-man's switch fires, regardless of vault state.
+
+---
+
+## Features
+
+### For creators
+- **Email-verified accounts** — registration requires email verification
+- **Recipient management** — add keyholders and beneficiaries with passcodes; invitation email sent automatically
+- **M-of-N threshold unlock** — require 1, 2, or all keyholders to confirm; vault survives a missing keyholder
+- **Dead-man's switch** — configurable inactivity timer with email check-in and grace period
+- **Scheduled section releases** — global unlock, fixed date, or relative delay per section
+- **Rich letter editor** — WYSIWYG text formatting
+- **Voice & video messages** — record directly in the browser; stored encrypted with the section
+- **Photo gallery** — attach photos displayed as a gallery grid with lightbox after unlock
+- **File attachments** — PDFs, documents, any file type; downloadable after unlock
+- **Section preview** — see exactly what recipients will read before sealing; send a preview to your own email
+- **Account settings** — update name, email, or password; email change triggers re-verification
+- **Forgot password** — secure reset link via email (expires in 1 hour)
+- **Toast notifications** — confirmation after every create, update, or delete action
+
+### For recipients
+- **Reader portal** — access sealed sections with name + passcode
+- **Per-section readability** — sections unlock independently based on their schedule
+- **Inline audio/video playback** — voice and video messages play directly in the portal
+- **Photo gallery with lightbox** — photos shown in a grid, click to view full-screen
+- **Unlock notifications** — email sent when the vault opens, or when a scheduled section becomes available
 
 ---
 
@@ -71,6 +106,7 @@ Creator                    Keyholders                  Beneficiaries
 | **Framework** | Next.js 16 (App Router) |
 | **Frontend** | React 18, Tailwind CSS |
 | **Database** | MySQL 8 via `mysql2` |
+| **Email** | Nodemailer (SMTP — Mailtrap, SendGrid, etc.) |
 | **Runtime** | Node.js 22 |
 | **Process manager** | PM2 |
 | **Reverse proxy** | Nginx |
@@ -83,8 +119,11 @@ Creator                    Keyholders                  Beneficiaries
 | Writer passwords | bcrypt (12 rounds) |
 | Recipient passcodes | bcrypt (12 rounds) — hashes stored, originals AES-encrypted for display |
 | Letter content | AES-256-GCM at rest — unreadable without `LETTER_ENCRYPTION_KEY` |
-| Public API | Returns only `passcodeCount`, never passcode hashes or plaintexts |
+| Email verification | UUID token, single-use, clears on verify |
+| Password reset | UUID token, expires in 1 hour |
 | Passcode validation | Server-side only via `bcrypt.compare()` — nothing validated in the browser |
+| Public API | Returns only `passcodeCount`, never passcode hashes or plaintexts |
+| Cron endpoint | Protected by `CRON_SECRET` bearer token |
 
 ### Project Structure
 
@@ -92,32 +131,54 @@ Creator                    Keyholders                  Beneficiaries
 letter-vault/
 ├── app/
 │   ├── api/
-│   │   ├── recipients/          # GET all, POST confirm
+│   │   ├── cron/check/          # Daily DMS + scheduled release check
+│   │   ├── heartbeat/           # Creator clicks "I'm still here" link
+│   │   ├── reset-password/      # GET (form) + POST (set new password)
+│   │   ├── verify-email/        # GET — verify email token
+│   │   ├── test-email/          # POST — smoke-test SMTP
+│   │   ├── recipients/
+│   │   │   ├── route.js         # GET all (public)
+│   │   │   ├── confirm/         # POST — keyholder confirms
+│   │   │   └── [readerName]/sections/
 │   │   └── writers/
 │   │       ├── login/           # POST
-│   │       ├── register/        # POST
+│   │       ├── register/        # POST — creates unverified account + sends verification email
+│   │       ├── forgot-password/ # POST — sends reset link
+│   │       ├── resend-verification/
 │   │       ├── reset-confirmations/
 │   │       └── [writerId]/
-│   │           ├── data/        # GET writer dashboard data
+│   │           ├── account/     # PATCH — update name/email/password
+│   │           ├── data/        # GET — full dashboard data
+│   │           ├── dms/         # PATCH — update dead-man's switch config
+│   │           ├── preview-email/ # POST — send preview to creator's email
 │   │           ├── recipients/  # POST create, DELETE remove
-│   │           └── sections/    # POST create/edit, DELETE remove
+│   │           ├── sections/    # POST create/edit, DELETE remove
+│   │           └── threshold/   # PATCH — update M-of-N threshold
 │   ├── layout.jsx
 │   └── page.jsx
 ├── src/
 │   ├── App.jsx                  # Root client component & state
 │   ├── styles.css               # Design system & CSS classes
 │   └── components/
-│       ├── AuthPage.jsx         # Login / register / recipient confirm
-│       ├── BlogDashboard.jsx    # Writer dashboard
+│       ├── AuthPage.jsx         # Login / register / forgot password / recipient confirm
+│       ├── AccountSettings.jsx  # Edit name, email, password
+│       ├── BlogDashboard.jsx    # Creator dashboard
 │       ├── ReaderPortal.jsx     # Recipient letter view
 │       ├── CreatePostForm.jsx   # Write/edit a section
 │       ├── CreateReaderForm.jsx # Add a recipient
+│       ├── AttachmentPlayer.jsx # Audio/video/file renderer
+│       ├── DatePicker.jsx       # Custom themed calendar picker
+│       ├── PhotoGallery.jsx     # Image grid + lightbox
+│       ├── SectionPreviewModal.jsx # Creator preview of recipient view
+│       ├── VoiceVideoRecorder.jsx  # In-browser MediaRecorder
+│       ├── Toast.jsx            # Toast notification system
 │       ├── ConfirmModal.jsx     # Delete confirmation dialog
 │       ├── Logo.jsx             # SVG brand mark
-│       ├── StatusBadge.jsx      # Locked/Unlocked pill
+│       ├── StatusBadge.jsx      # Sealed/Unlocked pill
 │       └── WysiwygEditor.jsx    # Rich text editor
 ├── lib/
-│   └── db.js                   # MySQL pool, schema, seed, encrypt/decrypt
+│   ├── db.js                   # MySQL pool, schema, migrations, seed, encrypt/decrypt
+│   └── email.js                # Nodemailer transport + all email templates
 └── docs/
     └── screenshots/
 ```
@@ -156,6 +217,20 @@ DB_PORT=3306
 DB_USER=lettervault
 DB_PASSWORD=your_local_password
 DB_NAME=lettervault
+
+# SMTP (optional in dev — emails logged to console if not configured)
+SMTP_HOST=live.smtp.mailtrap.io
+SMTP_PORT=2525
+SMTP_SECURE=false
+SMTP_USER=your_smtp_user
+SMTP_PASS=your_smtp_password
+SMTP_FROM=Letter Vault <no-reply@your-domain.com>
+
+# Public base URL (used in email links)
+NEXT_PUBLIC_BASE_URL=http://localhost:3001
+
+# Cron secret (any random string)
+CRON_SECRET=dev-secret
 ```
 
 Create the local database:
@@ -176,18 +251,20 @@ npm run dev
 
 ### Demo Credentials
 
-| Type | Name | Passcode |
+| Type | Name | Credential |
 |---|---|---|
-| Keyholder | `alice` | `alpha` |
-| Keyholder | `bob` | `beta` |
-| Beneficiary | `sarah` | `gamma` |
 | Creator | `testator@example.com` | `writer123` |
+| Keyholder | `alice` | passcode: `alpha` |
+| Keyholder | `bob` | passcode: `beta` |
+| Beneficiary | `sarah` | passcode: `gamma` |
+
+> Seed accounts are pre-verified and pre-seeded with example sections.
 
 ---
 
 ## Deployment
 
-The app is deployed on a DigitalOcean droplet with:
+Deployed on a DigitalOcean droplet:
 
 - **Nginx** as a reverse proxy (port 80/443 → Node port 3000)
 - **PM2** for process management and auto-restart on reboot
@@ -198,10 +275,20 @@ The app is deployed on a DigitalOcean droplet with:
 ```bash
 ssh root@your-server
 cd /var/www/letter-vault
-git pull
+git pull origin main
 npm install
 npm run build
-pm2 restart letter-vault
+pm2 restart letter-vault --update-env
+```
+
+### Cron Job (dead-man's switch + scheduled releases)
+
+Add to server crontab — runs daily at 08:00:
+
+```bash
+0 8 * * * curl -s -X POST https://your-domain.com/api/cron/check \
+  -H "Authorization: Bearer your-cron-secret" \
+  >> /var/log/letter-vault-cron.log 2>&1
 ```
 
 ---
@@ -216,3 +303,13 @@ pm2 restart letter-vault
 | `DB_USER` | ✅ | MySQL username |
 | `DB_PASSWORD` | ✅ | MySQL password |
 | `DB_NAME` | ✅ | MySQL database name |
+| `SMTP_HOST` | ☑️ | SMTP server hostname |
+| `SMTP_PORT` | ☑️ | SMTP port (587 or 2525 typical) |
+| `SMTP_SECURE` | ☑️ | `true` for port 465, `false` otherwise |
+| `SMTP_USER` | ☑️ | SMTP username |
+| `SMTP_PASS` | ☑️ | SMTP password |
+| `SMTP_FROM` | ☑️ | From address shown to recipients |
+| `NEXT_PUBLIC_BASE_URL` | ☑️ | Public URL used in email links |
+| `CRON_SECRET` | ☑️ | Bearer token protecting `/api/cron/check` |
+
+> ☑️ Optional but required for email features (verification, invitations, dead-man's switch, notifications).
