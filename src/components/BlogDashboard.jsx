@@ -314,13 +314,20 @@ function RecipientCard({ reader, onDelete }) {
       <hr className="letter-rule" />
 
       <div className="flex items-end justify-between gap-3">
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-[var(--parchment-40)] mb-2" style={{ fontFamily: 'var(--font-display)' }}>
-            Passcode
-          </p>
-          <code className="rounded border border-[var(--amber-border)] bg-[var(--amber-subtle)] px-3 py-1.5 text-xs text-[var(--amber)] font-mono">
-            {reader.passcodesDisplay?.[0] ?? '••••••••'}
-          </code>
+        <div className="space-y-2 min-w-0">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-[var(--parchment-40)] mb-1.5" style={{ fontFamily: 'var(--font-display)' }}>
+              Passcode
+            </p>
+            <code className="rounded border border-[var(--amber-border)] bg-[var(--amber-subtle)] px-3 py-1.5 text-xs text-[var(--amber)] font-mono">
+              {reader.passcodesDisplay?.[0] ?? '••••••••'}
+            </code>
+          </div>
+          {reader.email && (
+            <p className="text-[10px] text-[var(--parchment-40)] truncate" title={reader.email}>
+              ✉ {reader.email}
+            </p>
+          )}
         </div>
         <button
           onClick={onDelete}

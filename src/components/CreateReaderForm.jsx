@@ -3,6 +3,7 @@ import { useState } from 'react';
 export default function CreateReaderForm({ onSave, onCancel }) {
   const [readerName, setReaderName] = useState('');
   const [passcode, setPasscode] = useState('');
+  const [email, setEmail] = useState('');
   const [isTrusted, setIsTrusted] = useState(true);
   const [error, setError] = useState('');
 
@@ -14,7 +15,7 @@ export default function CreateReaderForm({ onSave, onCancel }) {
       setError('Please enter a recipient name and a passcode.');
       return;
     }
-    const message = onSave({ readerName: cleanName, passcodes: [cleanPasscode], isTrusted });
+    const message = onSave({ readerName: cleanName, passcodes: [cleanPasscode], isTrusted, email: email.trim() || undefined });
     setError(message);
   }
 
@@ -59,6 +60,22 @@ export default function CreateReaderForm({ onSave, onCancel }) {
               placeholder="Set access passcode"
               className="vault-input px-4 py-3 text-sm outline-none"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="eyebrow-dim">
+              Email address <span className="normal-case text-[var(--parchment-40)] font-normal">(optional — for unlock notification)</span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="recipient@email.com"
+              className="vault-input px-4 py-3 text-sm outline-none"
+            />
+            <p className="text-[11px] text-[var(--parchment-40)] leading-relaxed">
+              If provided, this person will receive an email when the vault unlocks.
+            </p>
           </div>
 
           <label className="flex items-start gap-3.5 rounded-lg border border-[rgba(232,168,76,0.12)] bg-[var(--ink-2)] p-4 cursor-pointer group">

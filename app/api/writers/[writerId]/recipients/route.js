@@ -4,7 +4,7 @@ import { createId, getDb, getWriterData, bcrypt, SALT_ROUNDS, encrypt } from '..
 export async function POST(request, { params }) {
   const db = await getDb();
   const { writerId } = await params;
-  const { readerName, passcodes, isTrusted } = await request.json();
+  const { readerName, passcodes, isTrusted, email } = await request.json();
 
   if (!readerName || !Array.isArray(passcodes) || passcodes.length === 0) {
     return NextResponse.json(
@@ -18,13 +18,14 @@ export async function POST(request, { params }) {
       passcodes.map((p) => bcrypt.hash(p, SALT_ROUNDS)),
     );
     await db.run(
-      'INSERT INTO recipients (id, writer_id, reader_name, passcodes, passcodes_display, is_trusted) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO recipients (id, writer_id, reader_name, passcodes, passcodes_display, is_trusted, email) VALUES (?, ?, ?, ?, ?, ?, ?)',
       createId(),
       writerId,
       readerName,
       JSON.stringify(hashedPasscodes),
       encrypt(JSON.stringify(passcodes)),
       isTrusted ? 1 : 0,
+      email || null,
     );
     return NextResponse.json(await getWriterData(writerId), { status: 201 });
   } catch {

@@ -5,7 +5,7 @@ import {
   markDmzUnlocked,
   getWriterRecipients,
 } from '../../../../lib/db.js';
-import { sendEmail, buildWarningEmail, buildUnlockEmail } from '../../../../lib/email.js';
+import { sendEmail, buildWarningEmail, buildRecipientUnlockEmail } from '../../../../lib/email.js';
 
 // Protect the endpoint with a shared secret so only your cron job can call it.
 // Set CRON_SECRET in .env and pass it as: Authorization: Bearer <secret>
@@ -46,16 +46,20 @@ export async function POST(request) {
       if (graceSince >= graceMs) {
         await markDmzUnlocked(writer.id);
 
-        // Notify all recipients
+        // Notify all recipients that have an email address
         const recipients = await getWriterRecipients(writer.id);
-        const { subject, html } = buildUnlockEmail({ writerName: writer.name });
-        // We don't store recipient emails yet — notify placeholder (future feature)
-        // For now, just log. When recipient emails are added this loop sends to each.
-        for (const r of recipients) {
-          if (r.email) {
-            await sendEmail({ to: r.email, subject, html });
-          }
-        }
+        await Promise.allSettled(
+          recipients
+            .filter((r) => r.email)
+            .map((r) => {
+              const { subject, html } = buildRecipientUnlockEmail({
+                writerName: writer.name,
+                readerName: r.readerName,
+                triggeredByDms: true,
+              });
+              return sendEmail({ to: r.email, subject, html });
+            }),
+        );
 
         results.unlocked.push(writer.email);
       }
