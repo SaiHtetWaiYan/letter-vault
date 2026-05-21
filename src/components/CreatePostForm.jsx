@@ -225,7 +225,6 @@ export default function CreatePostForm({ readers, onSave, onCancel, post }) {
           <div className="space-y-3">
             <p className="text-xs font-semibold text-[var(--parchment-70)]">Photos</p>
             <label className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[rgba(232,168,76,0.15)] bg-[var(--ink-2)] p-6 hover:border-[rgba(232,168,76,0.3)] transition cursor-pointer">
-              <span className="text-2xl">🖼</span>
               <span className="text-sm font-semibold text-[var(--parchment-70)]">Click to add photos</span>
               <span className="text-[11px] text-[var(--parchment-40)]">JPG, PNG, GIF, WebP — shown as gallery after unlock</span>
               <input
