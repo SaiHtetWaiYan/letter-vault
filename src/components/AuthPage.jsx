@@ -22,6 +22,8 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
   const [pendingEmail, setPendingEmail] = useState(null); // set after registration, shows "check inbox"
   const [resendStatus, setResendStatus] = useState(''); // 'sent' | 'sending' | ''
   const [unverifiedEmail, setUnverifiedEmail] = useState(null); // set when login blocked due to unverified
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotStatus, setForgotStatus] = useState(''); // '' | 'sending' | 'sent'
 
   const requiredCount = useMemo(
     () => getReaderPasscodeCount(readers, readerName),
@@ -35,6 +37,8 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
     setError('');
     setUnverifiedEmail(null);
     setResendStatus('');
+    setForgotMode(false);
+    setForgotStatus('');
   }
 
   async function handleWriterSubmit(event) {
@@ -60,6 +64,17 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
         setError(result || '');
       }
     }
+  }
+
+  async function handleForgotPassword(e) {
+    e.preventDefault();
+    setForgotStatus('sending');
+    await fetch(`${API_BASE}/writers/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
+    });
+    setForgotStatus('sent');
   }
 
   async function handleResend(emailToResend) {
@@ -307,6 +322,50 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
                   {allReaderPasscodesPassed ? 'Open letter sections →' : 'Confirm passcode'}
                 </button>
               </form>
+            ) : forgotMode ? (
+              /* ── Forgot password form ── */
+              <div className="space-y-5">
+                <div className="space-y-1">
+                  <h2 className="text-2xl font-serif text-[var(--parchment)]">Forgot password</h2>
+                  <p className="text-xs leading-[1.7] text-[var(--parchment-40)]">
+                    Enter your email and we'll send a reset link if an account exists.
+                  </p>
+                </div>
+                {forgotStatus === 'sent' ? (
+                  <div className="rounded-lg border border-[rgba(232,168,76,0.2)] bg-[rgba(232,168,76,0.05)] px-4 py-4 space-y-1 text-center">
+                    <p className="text-sm font-semibold text-[var(--amber)]">Check your inbox</p>
+                    <p className="text-xs text-[var(--parchment-40)]">If an account exists, a reset link has been sent.</p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="eyebrow-dim">Email</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="your@email.com"
+                        className="vault-input px-4 py-3 text-sm outline-none"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={forgotStatus === 'sending'}
+                      className="letter-btn-primary w-full px-4 py-3 text-sm disabled:opacity-50"
+                    >
+                      {forgotStatus === 'sending' ? 'Sending…' : 'Send reset link →'}
+                    </button>
+                  </form>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setForgotMode(false); setForgotStatus(''); }}
+                  className="btn-flat w-full text-xs py-2"
+                >
+                  ← Back to sign in
+                </button>
+              </div>
             ) : (
               <form onSubmit={handleWriterSubmit} className="space-y-5">
                 <div className="space-y-1">
@@ -343,7 +402,18 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="eyebrow-dim">Password</label>
+                    <div className="flex items-center justify-between">
+                      <label className="eyebrow-dim">Password</label>
+                      {mode === 'writer-login' && (
+                        <button
+                          type="button"
+                          onClick={() => { setForgotMode(true); setError(''); setUnverifiedEmail(null); }}
+                          className="text-[10px] text-[var(--parchment-40)] hover:text-[var(--amber)] transition-colors"
+                        >
+                          Forgot password?
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="password"
                       value={password}
@@ -374,10 +444,7 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  className="letter-btn-primary w-full px-4 py-3 text-sm"
-                >
+                <button type="submit" className="letter-btn-primary w-full px-4 py-3 text-sm">
                   {mode === 'writer-register' ? 'Create account →' : 'Sign in →'}
                 </button>
               </form>

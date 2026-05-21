@@ -7,6 +7,7 @@ import BlogDashboard from './components/BlogDashboard.jsx';
 import CreateReaderForm from './components/CreateReaderForm.jsx';
 import CreatePostForm from './components/CreatePostForm.jsx';
 import ReaderPortal from './components/ReaderPortal.jsx';
+import AccountSettings from './components/AccountSettings.jsx';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/api';
 const SESSION_KEY = 'lastWillSession';
@@ -319,6 +320,27 @@ export default function App() {
     }
   }
 
+  async function updateAccount({ name, email, currentPassword, newPassword }) {
+    try {
+      const result = await apiRequest(`/writers/${currentWriter.id}/account`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name, email, currentPassword, newPassword }),
+      });
+      if (result.emailChanged) {
+        // Email changed — must re-verify, so log out
+        await logout();
+        return null; // signal to show re-verification message
+      }
+      // Update local writer name
+      setCurrentWriter(w => ({ ...w, name: result.name }));
+      saveSession({ type: 'writer', writer: { ...currentWriter, name: result.name }, page: 'writer-dashboard' });
+      setPage('writer-dashboard');
+      return '';
+    } catch (error) {
+      return error.message;
+    }
+  }
+
   async function deleteReader(readerId) {
     try {
       const data = await apiRequest(`/writers/${currentWriter.id}/recipients/${readerId}`, {
@@ -395,18 +417,9 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage('writer-dashboard')}
-              className="btn-flat"
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={logout}
-              className="btn-flat-danger"
-            >
-              Log out
-            </button>
+            <button onClick={() => setPage('writer-dashboard')} className="btn-flat">Dashboard</button>
+            <button onClick={() => setPage('account-settings')} className="btn-flat">Account</button>
+            <button onClick={logout} className="btn-flat-danger">Log out</button>
           </div>
         </div>
       </header>
@@ -452,6 +465,14 @@ export default function App() {
               setEditingPost(null);
               setPage('writer-dashboard');
             }}
+          />
+        )}
+
+        {page === 'account-settings' && (
+          <AccountSettings
+            writer={currentWriter}
+            onSave={updateAccount}
+            onCancel={() => setPage('writer-dashboard')}
           />
         )}
       </main>
