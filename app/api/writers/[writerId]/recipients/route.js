@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createId, getDb, getWriterData, bcrypt, SALT_ROUNDS, encrypt } from '../../../../../lib/db.js';
+import { sendEmail, buildRecipientInviteEmail } from '../../../../../lib/email.js';
 
 export async function POST(request, { params }) {
   const db = await getDb();
@@ -27,6 +28,21 @@ export async function POST(request, { params }) {
       isTrusted ? 1 : 0,
       email || null,
     );
+
+    // Send invitation email if recipient has an email address
+    if (email) {
+      const writer = await db.get('SELECT name FROM writers WHERE id = ?', writerId);
+      if (writer) {
+        const { subject, html } = buildRecipientInviteEmail({
+          writerName: writer.name,
+          readerName,
+          passcode: passcodes[0], // send the plain passcode before it's hashed
+          isTrusted: Boolean(isTrusted),
+        });
+        await sendEmail({ to: email, subject, html });
+      }
+    }
+
     return NextResponse.json(await getWriterData(writerId), { status: 201 });
   } catch {
     return NextResponse.json({ message: 'This recipient name already exists.' }, { status: 409 });
