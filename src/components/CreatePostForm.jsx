@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import WysiwygEditor from './WysiwygEditor.jsx';
+import DatePicker from './DatePicker.jsx';
 
 function inferReleaseMode(post) {
   if (!post) return 'global';
@@ -173,12 +174,10 @@ export default function CreatePostForm({ readers, onSave, onCancel, post }) {
           {releaseMode === 'date' && (
             <div className="space-y-1.5">
               <label className="eyebrow-dim">Release date</label>
-              <input
-                type="date"
+              <DatePicker
                 value={releaseDate}
-                onChange={(e) => setReleaseDate(e.target.value)}
+                onChange={setReleaseDate}
                 min={new Date().toISOString().slice(0, 10)}
-                className="vault-input px-4 py-3 text-sm outline-none"
               />
               <p className="text-[11px] text-[var(--parchment-40)]">
                 This section will become readable on this date, even if the vault is still sealed.
