@@ -132,6 +132,14 @@ export default function BlogDashboard({
             );
           })()}
         </article>
+
+        {previewPost && (
+          <SectionPreviewModal
+            post={previewPost}
+            writer={writer}
+            onClose={() => setPreviewPost(null)}
+          />
+        )}
       </div>
     );
   }
