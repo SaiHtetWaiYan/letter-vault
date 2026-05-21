@@ -73,7 +73,7 @@ export default function BlogDashboard({
               onClick={() => setPreviewPost(selectedPost)}
               className="btn-flat px-4 py-2 text-sm"
             >
-              👁 Preview
+              Preview
             </button>
             <button
               onClick={() => onEditPost(selectedPost)}
@@ -351,7 +351,7 @@ function SectionCard({ post, isReadable, badge, onSelect, onPreview, onDelete })
             className="btn-flat text-xs px-2 py-1"
             title="Preview as recipient"
           >
-            👁
+            Preview
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
