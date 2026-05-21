@@ -8,6 +8,7 @@ import CreateReaderForm from './components/CreateReaderForm.jsx';
 import CreatePostForm from './components/CreatePostForm.jsx';
 import ReaderPortal from './components/ReaderPortal.jsx';
 import AccountSettings from './components/AccountSettings.jsx';
+import ToastContainer, { useToast } from './components/Toast.jsx';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/api';
 const SESSION_KEY = 'lastWillSession';
@@ -72,6 +73,7 @@ export default function App() {
   const [editingPost, setEditingPost] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [appError, setAppError] = useState('');
+  const { toasts, show: showToast, dismiss: dismissToast } = useToast();
 
   const writerPosts = posts.filter((post) => post.writerId === currentWriter?.id);
   const writerReaders = readers.filter((reader) => reader.writerId === currentWriter?.id);
@@ -254,6 +256,7 @@ export default function App() {
       setReaders(data.readers);
       setPosts(data.posts);
       setPage('writer-dashboard');
+      showToast(`Recipient "${readerData.readerName}" added successfully.`);
       return '';
     } catch (error) {
       return error.message;
@@ -268,6 +271,8 @@ export default function App() {
       });
       setReaders(data.readers);
       setPosts(data.posts);
+      const isEdit = Boolean(postData.id);
+      showToast(isEdit ? `Section "${postData.title}" updated.` : `Section "${postData.title}" created.`);
       setEditingPost(null);
       setPage('writer-dashboard');
       return '';
@@ -283,6 +288,7 @@ export default function App() {
       });
       setReaders(data.readers);
       setPosts(data.posts);
+      showToast('Section deleted.');
     } catch (error) {
       setAppError(error.message);
     }
@@ -348,6 +354,7 @@ export default function App() {
       });
       setReaders(data.readers);
       setPosts(data.posts);
+      showToast('Recipient removed.');
     } catch (error) {
       setAppError(error.message);
     }
@@ -374,6 +381,7 @@ export default function App() {
   if (page === 'auth' || (!currentWriter && !readerSession)) {
     return (
       <>
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         {appError && (
           <div className="fixed left-1/2 top-4 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-lg border border-[var(--color-garnet-border)] bg-[var(--color-garnet-bg)] px-4 py-3 text-sm font-semibold text-[var(--color-garnet)]">
             {appError}
@@ -391,6 +399,8 @@ export default function App() {
 
   if (readerSession) {
     return (
+      <>
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <ReaderPortal
         readerName={readerSession.readerName}
         posts={readerPosts}
@@ -400,10 +410,13 @@ export default function App() {
         dmzUnlocked={dmzUnlocked}
         onLogout={logout}
       />
+      </>
     );
   }
 
   return (
+    <>
+    <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     <div className="min-h-screen">
       <header className="border-b border-[rgba(232,168,76,0.08)] bg-[var(--ink-0)] sticky top-0 z-10 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6 gap-4">
@@ -478,5 +491,6 @@ export default function App() {
         )}
       </main>
     </div>
+    </>
   );
 }
