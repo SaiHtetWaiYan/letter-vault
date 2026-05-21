@@ -7,13 +7,14 @@ function stripHtml(html) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-export default function ReaderPortal({ readerName, posts, confirmedReaders, trustedReaders = [], onLogout }) {
+export default function ReaderPortal({ readerName, posts, confirmedReaders, trustedReaders = [], unlockThreshold = 0, dmzUnlocked = false, onLogout }) {
   const [selectedPost, setSelectedPost] = useState(null);
 
-  const unconfirmedTrusted = trustedReaders.filter(
-    (n) => !confirmedReaders.some((c) => c.trim().toLowerCase() === n.trim().toLowerCase()),
-  );
-  const isVaultUnlocked = unconfirmedTrusted.length === 0;
+  const confirmedTrustedCount = trustedReaders.filter(
+    (n) => confirmedReaders.some((c) => c.trim().toLowerCase() === n.trim().toLowerCase()),
+  ).length;
+  const threshold = unlockThreshold > 0 ? unlockThreshold : trustedReaders.length;
+  const isVaultUnlocked = dmzUnlocked || (trustedReaders.length > 0 && confirmedTrustedCount >= threshold);
 
   function handleDownload(file) {
     const link = document.createElement('a');
@@ -111,8 +112,10 @@ export default function ReaderPortal({ readerName, posts, confirmedReaders, trus
             </h2>
             <p className="text-xs text-[var(--parchment-40)] leading-relaxed max-w-xl">
               {isVaultUnlocked
-                ? 'All required trusted keyholders have confirmed. Every assigned letter section is now readable.'
-                : 'Waiting for all trusted keyholders to confirm with their passcodes before sections are revealed.'}
+                ? dmzUnlocked
+                  ? 'The vault has been opened automatically. Every assigned letter section is now readable.'
+                  : `Threshold met (${confirmedTrustedCount} of ${threshold} required keyholder${threshold === 1 ? '' : 's'} confirmed). Every assigned letter section is now readable.`
+                : `Waiting for keyholders: ${confirmedTrustedCount} of ${threshold} required confirmation${threshold === 1 ? '' : 's'} received.`}
             </p>
           </div>
           <div className="flex-shrink-0">
@@ -234,7 +237,7 @@ function LockedMessage() {
         <p className="eyebrow text-[0.65rem] opacity-60">Access restricted</p>
         <h3 className="text-xl font-serif text-[var(--parchment-70)]">This section is sealed</h3>
         <p className="text-xs text-[var(--parchment-40)] max-w-xs mx-auto leading-relaxed pt-1">
-          All required trusted keyholders must confirm with their passcode before the contents of this section are revealed.
+          The required number of keyholders must confirm with their passcode before the contents of this section are revealed.
         </p>
       </div>
 

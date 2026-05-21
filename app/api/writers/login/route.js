@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, bcrypt } from '../../../../lib/db.js';
+import { getDb, bcrypt, touchLastActive } from '../../../../lib/db.js';
 
 export async function POST(request) {
   const db = await getDb();
@@ -17,6 +17,9 @@ export async function POST(request) {
       { status: 401 },
     );
   }
+
+  // Reset inactivity timer on every login
+  await touchLastActive(writer.id);
 
   return NextResponse.json({ id: writer.id, name: writer.name, email: writer.email });
 }

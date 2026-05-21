@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import StatusBadge from './StatusBadge.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import Logo from './Logo.jsx';
@@ -13,6 +13,12 @@ export default function BlogDashboard({
   readers,
   confirmedReaders = [],
   trustedReaders = [],
+  unlockThreshold = 0,
+  storedUnlockThreshold = null,
+  onSaveUnlockThreshold,
+  dms = null,
+  dmzUnlocked = false,
+  onSaveDmsConfig,
   onCreateReader,
   onCreatePost,
   onEditPost,
@@ -25,10 +31,11 @@ export default function BlogDashboard({
   const [confirmDelete, setConfirmDelete] = useState(null); // { type: 'post'|'reader', id, name }
 
   const totalPasscodes = readers.reduce((t, r) => t + r.passcodes.length, 0);
-  const unconfirmedTrusted = trustedReaders.filter(
-    (n) => !confirmedReaders.some((c) => c.trim().toLowerCase() === n.trim().toLowerCase()),
-  );
-  const isVaultUnlocked = trustedReaders.length > 0 && unconfirmedTrusted.length === 0;
+  const confirmedTrustedCount = trustedReaders.filter(
+    (n) => confirmedReaders.some((c) => c.trim().toLowerCase() === n.trim().toLowerCase()),
+  ).length;
+  const effectiveThreshold = unlockThreshold > 0 ? unlockThreshold : trustedReaders.length;
+  const isVaultUnlocked = dmzUnlocked || (trustedReaders.length > 0 && confirmedTrustedCount >= effectiveThreshold);
 
   /* ── Single post view ─────────────────────── */
   if (selectedPost) {
@@ -94,6 +101,16 @@ export default function BlogDashboard({
             Configure sealed letter sections, assign recipients as keyholders or beneficiaries,
             and monitor vault release state.
           </p>
+          {trustedReaders.length > 0 && (
+            <ThresholdControl
+              trustedCount={trustedReaders.length}
+              effectiveThreshold={effectiveThreshold}
+              storedThreshold={storedUnlockThreshold}
+              confirmedCount={confirmedTrustedCount}
+              onSave={onSaveUnlockThreshold}
+            />
+          )}
+          <DeadManControl dms={dms} dmzUnlocked={dmzUnlocked} onSave={onSaveDmsConfig} />
           {confirmedReaders.length > 0 && (
             <div className="pt-2">
               <button
@@ -150,7 +167,9 @@ export default function BlogDashboard({
             <div>
               <h3 className="text-lg font-serif">Letter sections</h3>
               <p className="text-xs text-[var(--parchment-40)] mt-0.5">
-                All sections unlock once every trusted keyholder has confirmed.
+                {trustedReaders.length > 0
+                  ? `Sections unlock once ${effectiveThreshold} of ${trustedReaders.length} keyholder${trustedReaders.length === 1 ? '' : 's'} confirm${effectiveThreshold === 1 ? 's' : ''}.`
+                  : 'Add a keyholder to enable vault unlock.'}
               </p>
             </div>
             <button
@@ -338,6 +357,192 @@ function AttachmentRow({ file }) {
       >
         Download
       </button>
+    </div>
+  );
+}
+
+function DeadManControl({ dms, dmzUnlocked, onSave }) {
+  const [inactivityDays, setInactivityDays] = useState(dms?.inactivityDays ?? 90);
+  const [graceDays, setGraceDays] = useState(dms?.graceDays ?? 30);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    setInactivityDays(dms?.inactivityDays ?? 90);
+    setGraceDays(dms?.graceDays ?? 30);
+  }, [dms]);
+
+  async function handleSave() {
+    setSaving(true);
+    setMsg('');
+    const err = await onSave({ inactivityDays: Number(inactivityDays), graceDays: Number(graceDays) });
+    setSaving(false);
+    setMsg(err || 'Saved.');
+  }
+
+  const lastActive = dms?.lastActiveAt ? new Date(dms.lastActiveAt) : null;
+  const warningSent = dms?.warningSentAt ? new Date(dms.warningSentAt) : null;
+
+  function daysAgo(date) {
+    const diff = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+    return diff;
+  }
+
+  function daysUntilWarning() {
+    if (!lastActive) return null;
+    const elapsed = daysAgo(lastActive);
+    return Math.max(0, inactivityDays - elapsed);
+  }
+
+  function daysUntilUnlock() {
+    if (!warningSent) return null;
+    const elapsed = daysAgo(warningSent);
+    return Math.max(0, graceDays - elapsed);
+  }
+
+  const status = dmzUnlocked
+    ? { label: 'Vault opened automatically', tone: 'green' }
+    : warningSent
+    ? { label: `Warning sent — auto-unlock in ${daysUntilUnlock()} day${daysUntilUnlock() === 1 ? '' : 's'}`, tone: 'red' }
+    : lastActive
+    ? { label: `Active — warning in ${daysUntilWarning()} day${daysUntilWarning() === 1 ? '' : 's'}`, tone: 'amber' }
+    : { label: 'Not yet activated (log in to start)', tone: 'dim' };
+
+  const toneClass = {
+    green: 'text-[var(--color-sage)]',
+    red: 'text-[var(--color-garnet)]',
+    amber: 'text-[var(--amber)]',
+    dim: 'text-[var(--parchment-40)]',
+  }[status.tone];
+
+  return (
+    <div className="pt-3 mt-2 border-t border-[rgba(232,168,76,0.08)] space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="eyebrow text-[0.58rem]">Dead-man's switch</p>
+        <span className={`text-[11px] font-medium ${toneClass}`}>{status.label}</span>
+      </div>
+
+      {!dmzUnlocked && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label className="text-xs text-[var(--parchment-70)] flex items-center gap-2">
+              Warn after
+              <input
+                type="number"
+                min={1}
+                max={3650}
+                value={inactivityDays}
+                onChange={(e) => setInactivityDays(e.target.value)}
+                className="w-16 rounded border border-[var(--amber-border)] bg-[var(--ink-2)] px-2 py-1 text-sm text-[var(--parchment)] font-mono"
+              />
+              days of inactivity
+            </label>
+            <label className="text-xs text-[var(--parchment-70)] flex items-center gap-2">
+              Auto-unlock after
+              <input
+                type="number"
+                min={1}
+                max={365}
+                value={graceDays}
+                onChange={(e) => setGraceDays(e.target.value)}
+                className="w-16 rounded border border-[var(--amber-border)] bg-[var(--ink-2)] px-2 py-1 text-sm text-[var(--parchment)] font-mono"
+              />
+              more days
+            </label>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="letter-btn-primary px-3 py-1 text-xs disabled:opacity-40"
+            >
+              Save
+            </button>
+          </div>
+          <p className="text-[11px] text-[var(--parchment-40)] leading-relaxed">
+            If you don't log in for <strong className="text-[var(--parchment-70)]">{inactivityDays} days</strong>, we'll email you a check-in link.
+            If you don't respond within <strong className="text-[var(--parchment-70)]">{graceDays} more days</strong>, the vault opens automatically
+            and your letters are delivered. Logging in at any time resets the timer.
+          </p>
+          {msg && <p className="text-[11px] text-[var(--amber)]">{msg}</p>}
+        </div>
+      )}
+
+      {dmzUnlocked && (
+        <p className="text-[11px] text-[var(--parchment-40)]">
+          The dead-man's switch triggered. All recipients have been notified and the vault is now open.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ThresholdControl({ trustedCount, effectiveThreshold, storedThreshold, confirmedCount, onSave }) {
+  const [value, setValue] = useState(effectiveThreshold);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  // Keep input in sync if threshold updates from server (e.g. keyholders added/removed)
+  useEffect(() => {
+    setValue(effectiveThreshold);
+  }, [effectiveThreshold]);
+
+  async function handleSave() {
+    setSaving(true);
+    setMsg('');
+    const err = await onSave(Number(value));
+    setSaving(false);
+    setMsg(err || 'Saved.');
+  }
+
+  async function handleReset() {
+    setSaving(true);
+    setMsg('');
+    const err = await onSave(null);
+    setSaving(false);
+    setMsg(err || 'Reset to default (majority).');
+  }
+
+  const isDirty = Number(value) !== effectiveThreshold;
+  const isDefault = storedThreshold == null;
+
+  return (
+    <div className="pt-3 mt-2 border-t border-[rgba(232,168,76,0.08)] space-y-2">
+      <p className="eyebrow text-[0.58rem]">Unlock threshold (M-of-N)</p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <label className="text-xs text-[var(--parchment-70)] flex items-center gap-2">
+          Require
+          <input
+            type="number"
+            min={1}
+            max={trustedCount}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="w-16 rounded border border-[var(--amber-border)] bg-[var(--ink-2)] px-2 py-1 text-sm text-[var(--parchment)] font-mono"
+          />
+          of {trustedCount} keyholder{trustedCount === 1 ? '' : 's'}
+        </label>
+        <button
+          onClick={handleSave}
+          disabled={saving || !isDirty || Number(value) < 1 || Number(value) > trustedCount}
+          className="letter-btn-primary px-3 py-1 text-xs disabled:opacity-40"
+        >
+          Save
+        </button>
+        {!isDefault && (
+          <button
+            onClick={handleReset}
+            disabled={saving}
+            className="btn-flat text-xs"
+            title="Reset to majority default"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+      <p className="text-[11px] text-[var(--parchment-40)]">
+        {confirmedCount} of {effectiveThreshold} required confirmation{effectiveThreshold === 1 ? '' : 's'} received.
+        {isDefault && ' Currently using majority default.'}
+      </p>
+      {msg && <p className="text-[11px] text-[var(--amber)]">{msg}</p>}
     </div>
   );
 }

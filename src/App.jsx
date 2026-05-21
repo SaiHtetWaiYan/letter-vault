@@ -63,6 +63,10 @@ export default function App() {
   const [readers, setReaders] = useState([]);
   const [confirmedReaders, setConfirmedReaders] = useState([]);
   const [trustedReaders, setTrustedReaders] = useState([]);
+  const [unlockThreshold, setUnlockThreshold] = useState(0);
+  const [storedUnlockThreshold, setStoredUnlockThreshold] = useState(null);
+  const [dms, setDms] = useState(null);
+  const [dmzUnlocked, setDmzUnlocked] = useState(false);
   const [page, setPage] = useState('auth');
   const [editingPost, setEditingPost] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,6 +110,8 @@ export default function App() {
         setPosts(data.posts);
         setConfirmedReaders(data.confirmedReaders);
         setTrustedReaders(data.trustedReaders || []);
+        setUnlockThreshold(data.unlockThreshold || 0);
+        setDmzUnlocked(data.dmzUnlocked || false);
         setReaderSession({ readerName: session.readerName });
         setCurrentWriter(null);
         setPage('reader-portal');
@@ -142,6 +148,10 @@ export default function App() {
     setPosts(data.posts);
     setConfirmedReaders(data.confirmedReaders || []);
     setTrustedReaders(data.trustedReaders || []);
+    setUnlockThreshold(data.unlockThreshold || 0);
+    setStoredUnlockThreshold(data.storedUnlockThreshold ?? null);
+    setDms(data.dms || null);
+    setDmzUnlocked(data.dms?.dmzUnlockedAt != null);
   }
 
   async function resetConfirmations() {
@@ -203,6 +213,8 @@ export default function App() {
       setPosts(data.posts);
       setConfirmedReaders(data.confirmedReaders);
       setTrustedReaders(data.trustedReaders || []);
+      setUnlockThreshold(data.unlockThreshold || 0);
+      setDmzUnlocked(data.dmzUnlocked || false);
       setReaderSession({ readerName });
       setCurrentWriter(null);
       setPage('reader-portal');
@@ -266,6 +278,38 @@ export default function App() {
     }
   }
 
+  async function saveDmsConfig(config) {
+    try {
+      const data = await apiRequest(`/writers/${currentWriter.id}/dms`, {
+        method: 'PATCH',
+        body: JSON.stringify(config),
+      });
+      setDms(data.dms || null);
+      setDmzUnlocked(data.dms?.dmzUnlockedAt != null);
+      return '';
+    } catch (error) {
+      return error.message;
+    }
+  }
+
+  async function saveUnlockThreshold(value) {
+    try {
+      const data = await apiRequest(`/writers/${currentWriter.id}/threshold`, {
+        method: 'PATCH',
+        body: JSON.stringify({ unlockThreshold: value }),
+      });
+      setReaders(data.readers);
+      setPosts(data.posts);
+      setConfirmedReaders(data.confirmedReaders || []);
+      setTrustedReaders(data.trustedReaders || []);
+      setUnlockThreshold(data.unlockThreshold || 0);
+      setStoredUnlockThreshold(data.storedUnlockThreshold ?? null);
+      return '';
+    } catch (error) {
+      return error.message;
+    }
+  }
+
   async function deleteReader(readerId) {
     try {
       const data = await apiRequest(`/writers/${currentWriter.id}/recipients/${readerId}`, {
@@ -321,6 +365,8 @@ export default function App() {
         posts={readerPosts}
         confirmedReaders={confirmedReaders}
         trustedReaders={trustedReaders}
+        unlockThreshold={unlockThreshold}
+        dmzUnlocked={dmzUnlocked}
         onLogout={logout}
       />
     );
@@ -363,6 +409,12 @@ export default function App() {
             readers={writerReaders}
             confirmedReaders={confirmedReaders}
             trustedReaders={trustedReaders}
+            unlockThreshold={unlockThreshold}
+            storedUnlockThreshold={storedUnlockThreshold}
+            onSaveUnlockThreshold={saveUnlockThreshold}
+            dms={dms}
+            dmzUnlocked={dmzUnlocked}
+            onSaveDmsConfig={saveDmsConfig}
             onCreateReader={() => setPage('create-reader')}
             onCreatePost={() => {
               setEditingPost(null);
