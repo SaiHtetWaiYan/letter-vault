@@ -69,7 +69,9 @@ export default function App() {
   async function restoreSession() {
     try {
       setIsLoading(true);
-      const session = await apiRequest('/session');
+      const res = await fetch(`${API_BASE}/session`);
+      if (!res.ok) { setIsLoading(false); return; }
+      const session = await res.json();
 
       if (session.type === 'writer') {
         setCurrentWriter(session.writer);
