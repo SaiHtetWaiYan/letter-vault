@@ -55,13 +55,13 @@ Every section can carry text, photos, voice recordings, and video messages. Beca
 ### Workflow
 
 ```
-Creator                    Keyholders                   Recipients
+Creator                    Keyholders                   Beneficiaries
    │                           │                             │
    ├─ Register + verify email  │                             │
    ├─ Add recipients           │                             │
    │   ├─ alice (keyholder)    ◄── invitation email sent     │
    │   ├─ bob   (keyholder)    ◄── invitation email sent     │
-   │   └─ sarah (beneficiary)  ◄── invitation email sent     │
+   │   └─ sarah (beneficiary)  ─────────────────────────────►│ invitation
    ├─ Write letter sections    │                             │
    │   ├─ global unlock        │                             │
    │   ├─ fixed date           │                             │
@@ -69,24 +69,45 @@ Creator                    Keyholders                   Recipients
    ├─ Set unlock threshold     │                             │
    │   └─ e.g. 2 of 3          │                             │
    └─ Configure dead-man's switch                            │
-                               │                             │
-                          alice confirms ───────────────────►│ (threshold not yet met)
-                          bob confirms   ───────────────────►│
+       (inactivity / grace / keyholder-grace days)           │
                                                              │
-                                               Vault unlocks (threshold met)
-                                               All recipients notified by email
-                                               Sections readable per their schedule
+─── Creator inactive for 90 days ──────────                  │
+   ◄── check-in email "Are you still here?"                  │
+                                                             │
+─── No response for 30 more days (DMS fires) ──              │
+                          ◄── only keyholders                │
+                              notified to confirm            │
+                                                             │
+                          alice confirms ──┐                 │
+                          bob confirms ────┴── threshold met │
+                                                             │
+                                               Vault opens ──►│ "your letter is ready"
+                                                             │
+   ── OR — if keyholders silent for 14 more days ──          │
+              Force-unlock + everyone notified ─────────────►│
 ```
 
-#### Unlock paths
+#### Unlock flow
 
-There are three ways the vault can open:
+The vault opens through a staged process that requires both the dead-man's switch to fire **and** keyholders to confirm — with a final safety net if keyholders are unreachable.
 
-1. **Keyholder confirmation (M-of-N)** — once the required number of keyholders confirm with their passcodes, the vault opens. The threshold is configurable (default: majority). If a keyholder dies or goes missing, the remaining keyholders can still unlock.
+**Stage 1 — Inactivity warning**
+If the creator doesn't log in for `inactivity_days` (default 90), a check-in email is sent with an "I'm still here" link. Clicking the link resets the timer.
 
-2. **Dead-man's switch** — if the creator doesn't log in for N days, a warning email is sent. If there's no response within the grace period, the vault opens automatically. Clicking the "I'm still here" link in the warning email resets the timer.
+**Stage 2 — DMS fires, keyholders notified**
+If the creator doesn't respond within `grace_days` (default 30), the dead-man's switch fires. **Only keyholders** receive an email asking them to log in and confirm with their passcode. Beneficiaries are not notified yet.
 
-3. **Scheduled release date** — individual sections can be set to open on a specific date (e.g. a birthday, an anniversary) or N days after the dead-man's switch fires, regardless of vault state.
+**Stage 3 — Vault opens**
+The vault opens via one of two paths:
+
+- **Keyholder confirmation (M-of-N)** — once the required number of keyholders confirm, the vault opens and **beneficiaries are notified**. The threshold is configurable (default: majority). If a keyholder dies or goes missing, the remaining keyholders can still reach the threshold.
+- **Force-unlock** — if keyholders don't confirm within `keyholder_grace_days` (default 14), the vault opens automatically and **all recipients** are notified. This prevents letters from being stuck if every keyholder is unreachable.
+
+**Scheduled release dates**
+Individual sections can be set to open on a specific date (e.g. a birthday, an anniversary) or N days after the vault opens — independent of the staged flow above.
+
+**Edge case — no keyholders:**
+If the creator hasn't assigned any keyholders, the dead-man's switch alone opens the vault as soon as Stage 2 fires.
 
 ---
 
@@ -94,9 +115,10 @@ There are three ways the vault can open:
 
 ### For creators
 - **Email-verified accounts** — registration requires email verification
-- **Recipient management** — add keyholders and beneficiaries with passcodes; invitation email sent automatically
+- **Recipient management** — add keyholders and beneficiaries with passcodes and email (required); invitation email sent automatically
 - **M-of-N threshold unlock** — require 1, 2, or all keyholders to confirm; vault survives a missing keyholder
-- **Dead-man's switch** — configurable inactivity timer with email check-in and grace period
+- **Three-stage dead-man's switch** — configurable inactivity → warning → keyholder notification → force-unlock fallback
+- **Keyholder-first notification** — when DMS fires, only keyholders are emailed first; beneficiaries only hear when the vault actually opens
 - **Scheduled section releases** — global unlock, fixed date, or relative delay per section
 - **Rich letter editor** — WYSIWYG text formatting
 - **Voice & video messages** — record directly in the browser; stored encrypted with the section
@@ -133,14 +155,21 @@ There are three ways the vault can open:
 
 | Concern | Implementation |
 |---|---|
-| Writer passwords | bcrypt (12 rounds) |
-| Recipient passcodes | bcrypt (12 rounds) — hashes stored, originals AES-encrypted for display |
+| Writer passwords | bcrypt (12 rounds), minimum 8 characters |
+| Recipient passcodes | bcrypt (12 rounds), minimum 4 characters — hashes stored, originals AES-encrypted for display |
 | Letter content | AES-256-GCM at rest — unreadable without `LETTER_ENCRYPTION_KEY` |
-| Email verification | UUID token, single-use, clears on verify |
-| Password reset | UUID token, expires in 1 hour |
+| Sessions | HMAC-signed httpOnly cookies (writer + reader); `secure` in production |
+| CSRF | Same-origin check on every mutation endpoint |
+| Rate limiting | IP-based on login (8/min), register (5/min), confirm (12/min), forgot-password (5/min), cron (5/min) |
+| HTML sanitization | Tag/attribute whitelist; strips `<script>`, blocks `javascript:` URIs |
+| Attachments | MIME-type whitelist, 10MB size cap, validates data URI prefix |
+| Email verification | SHA-256 hashed UUID token, 24-hour expiry, single-use |
+| Password reset | SHA-256 hashed UUID token, 1-hour expiry |
+| Heartbeat token | SHA-256 hashed; two-step (GET shows form, POST resets timer) |
 | Passcode validation | Server-side only via `bcrypt.compare()` — nothing validated in the browser |
-| Public API | Returns only `passcodeCount`, never passcode hashes or plaintexts |
-| Cron endpoint | Protected by `CRON_SECRET` bearer token |
+| Cron endpoint | `CRON_SECRET` bearer token + rate limit |
+| Email enumeration | Forgot-password always returns 200 regardless of account existence |
+| Test endpoint | `/api/test-email` blocked in production (`NODE_ENV=production`) |
 
 ### Project Structure
 
@@ -315,6 +344,7 @@ Add to server crontab — runs daily at 08:00:
 | Variable | Required | Description |
 |---|---|---|
 | `LETTER_ENCRYPTION_KEY` | ✅ | 64-char hex string (32 bytes). Encrypts all letter content at rest. **Back this up — losing it makes all letters unreadable.** |
+| `AUTH_SECRET` | ☑️ | Secret used to HMAC-sign session cookies. Falls back to `LETTER_ENCRYPTION_KEY` if unset, but a dedicated value is recommended. |
 | `DB_HOST` | ✅ | MySQL host |
 | `DB_PORT` | ✅ | MySQL port (default `3306`) |
 | `DB_USER` | ✅ | MySQL username |
