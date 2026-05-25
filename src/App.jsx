@@ -93,24 +93,17 @@ export default function App() {
         return;
       }
 
-      await loadPublicRecipients();
+      setIsLoading(false);
     } catch (error) {
-      await loadPublicRecipients();
+      setIsLoading(false);
     } finally {
       setIsLoading(false);
     }
   }
 
   async function loadPublicRecipients() {
-    try {
-      setIsLoading(true);
-      setReaders(await apiRequest('/recipients'));
-      setAppError('');
-    } catch (error) {
-      setAppError(error.message);
-    } finally {
-      setIsLoading(false);
-    }
+    // No longer exposes public recipient list — recipients enter name + passcode directly
+    setIsLoading(false);
   }
 
   async function loadWriterData(writerId) {
@@ -362,7 +355,6 @@ export default function App() {
           </div>
         )}
         <AuthPage
-          readers={readers}
           onRegisterWriter={registerWriter}
           onLoginWriter={loginWriter}
           onReaderUnlocked={startReaderSession}
