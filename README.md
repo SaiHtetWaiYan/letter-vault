@@ -1,5 +1,9 @@
 # Letter Vault
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Self-Hosted](https://img.shields.io/badge/Self--Hosted-✓-green)](#deployment)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
+
 There are things we mean to say but never find the right moment for. Things we'd only want someone to read after we're gone. Words we'd write differently if we knew they were final.
 
 **Letter Vault** is a private posthumous letter system built for that purpose.
