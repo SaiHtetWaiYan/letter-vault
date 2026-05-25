@@ -11,15 +11,20 @@ export default function CreateReaderForm({ onSave, onCancel }) {
     event.preventDefault();
     const cleanName = readerName.trim();
     const cleanPasscode = passcode.trim();
-    if (!cleanName || !cleanPasscode) {
-      setError('Please enter a recipient name and a passcode.');
+    const cleanEmail = email.trim();
+    if (!cleanName || !cleanPasscode || !cleanEmail) {
+      setError('Recipient name, passcode, and email are all required.');
       return;
     }
     if (cleanPasscode.length < 4) {
       setError('Passcode must be at least 4 characters.');
       return;
     }
-    const message = onSave({ readerName: cleanName, passcodes: [cleanPasscode], isTrusted, email: email.trim() || undefined });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    const message = onSave({ readerName: cleanName, passcodes: [cleanPasscode], isTrusted, email: cleanEmail });
     setError(message);
   }
 
@@ -68,7 +73,7 @@ export default function CreateReaderForm({ onSave, onCancel }) {
 
           <div className="space-y-1.5">
             <label className="eyebrow-dim">
-              Email address <span className="normal-case text-[var(--parchment-40)] font-normal">(optional — for unlock notification)</span>
+              Email address <span className="normal-case text-[var(--parchment-40)] font-normal">(required — for unlock notification)</span>
             </label>
             <input
               type="email"
@@ -78,7 +83,7 @@ export default function CreateReaderForm({ onSave, onCancel }) {
               className="vault-input px-4 py-3 text-sm outline-none"
             />
             <p className="text-[11px] text-[var(--parchment-40)] leading-relaxed">
-              If provided, this person will receive an email when the vault unlocks.
+              This person will receive an invitation now and an unlock notification when the vault opens.
             </p>
           </div>
 

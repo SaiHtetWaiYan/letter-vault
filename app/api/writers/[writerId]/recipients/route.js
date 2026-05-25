@@ -14,9 +14,16 @@ export async function POST(request, { params }) {
 
   const { readerName, passcodes, isTrusted, email } = await request.json();
 
-  if (!readerName || !Array.isArray(passcodes) || passcodes.length === 0) {
+  if (!readerName || !Array.isArray(passcodes) || passcodes.length === 0 || !email) {
     return NextResponse.json(
-      { message: 'Recipient name and passcodes are required.' },
+      { message: 'Recipient name, passcode, and email are all required.' },
+      { status: 400 },
+    );
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+    return NextResponse.json(
+      { message: 'Please provide a valid email address.' },
       { status: 400 },
     );
   }
