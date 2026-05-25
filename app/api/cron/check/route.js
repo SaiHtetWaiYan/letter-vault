@@ -8,6 +8,7 @@ import {
   markSectionReleased,
   getSectionRecipients,
   applyRelativeReleaseDates,
+  getVaultUnlockStatus,
 } from '../../../../lib/db.js';
 import {
   sendEmail,
@@ -52,6 +53,10 @@ export async function POST(request) {
         // Set release dates for relative-delay sections using now as anchor
         await applyRelativeReleaseDates(writer.id, now);
 
+        // Check if keyholders still need to confirm
+        const vaultStatus = await getVaultUnlockStatus(writer.id);
+        const hasKeyholders = !vaultStatus.isUnlocked && vaultStatus.threshold > 0;
+
         // Notify all recipients with emails
         const recipients = await getWriterRecipients(writer.id);
         await Promise.allSettled(
@@ -60,6 +65,7 @@ export async function POST(request) {
               writerName: writer.name,
               readerName: r.readerName,
               triggeredByDms: true,
+              needsKeyholder: hasKeyholders && r.isTrusted,
             });
             return sendEmail({ to: r.email, subject, html });
           }),

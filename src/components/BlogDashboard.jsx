@@ -40,7 +40,14 @@ export default function BlogDashboard({
     (n) => confirmedReaders.some((c) => c.trim().toLowerCase() === n.trim().toLowerCase()),
   ).length;
   const effectiveThreshold = unlockThreshold > 0 ? unlockThreshold : trustedReaders.length;
-  const isVaultUnlocked = dmzUnlocked || (trustedReaders.length > 0 && confirmedTrustedCount >= effectiveThreshold);
+  // Vault unlocks only when BOTH conditions are met:
+  // 1. Dead-man's switch has fired (creator is unreachable)
+  // 2. Required keyholders have confirmed (M-of-N threshold met)
+  // If there are no keyholders, DMS alone unlocks the vault.
+  const thresholdMet = trustedReaders.length > 0 && confirmedTrustedCount >= effectiveThreshold;
+  const isVaultUnlocked = trustedReaders.length === 0
+    ? dmzUnlocked
+    : dmzUnlocked && thresholdMet;
 
   function isSectionReadable(post) {
     if (isVaultUnlocked) return true;

@@ -16,7 +16,14 @@ export default function ReaderPortal({ readerName, posts, confirmedReaders, trus
     (n) => confirmedReaders.some((c) => c.trim().toLowerCase() === n.trim().toLowerCase()),
   ).length;
   const threshold = unlockThreshold > 0 ? unlockThreshold : trustedReaders.length;
-  const isVaultUnlocked = dmzUnlocked || (trustedReaders.length > 0 && confirmedTrustedCount >= threshold);
+  // Vault unlocks only when BOTH conditions are met:
+  // 1. Dead-man's switch has fired (creator is unreachable)
+  // 2. Required keyholders have confirmed (M-of-N threshold met)
+  // If there are no keyholders, DMS alone unlocks the vault.
+  const thresholdMet = trustedReaders.length > 0 && confirmedTrustedCount >= threshold;
+  const isVaultUnlocked = trustedReaders.length === 0
+    ? dmzUnlocked
+    : dmzUnlocked && thresholdMet;
 
   function isSectionReadable(section) {
     if (isVaultUnlocked) return true;
@@ -130,10 +137,10 @@ export default function ReaderPortal({ readerName, posts, confirmedReaders, trus
             </h2>
             <p className="text-xs text-[var(--parchment-40)] leading-relaxed max-w-xl">
               {isVaultUnlocked
-                ? dmzUnlocked
-                  ? 'The vault has been opened automatically. Every assigned letter section is now readable.'
-                  : `Threshold met (${confirmedTrustedCount} of ${threshold} required keyholder${threshold === 1 ? '' : 's'} confirmed). Every assigned letter section is now readable.`
-                : `Waiting for keyholders: ${confirmedTrustedCount} of ${threshold} required confirmation${threshold === 1 ? '' : 's'} received.`}
+                ? 'The vault has been opened. Every assigned letter section is now readable.'
+                : !dmzUnlocked
+                  ? 'The vault is sealed. It will open when the time comes.'
+                  : `Vault release triggered. Waiting for keyholders: ${confirmedTrustedCount} of ${threshold} required confirmation${threshold === 1 ? '' : 's'} received.`}
             </p>
           </div>
           <div className="flex-shrink-0">
