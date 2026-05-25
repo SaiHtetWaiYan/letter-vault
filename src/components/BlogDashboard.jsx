@@ -35,7 +35,7 @@ export default function BlogDashboard({
   const [previewPost, setPreviewPost] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // { type: 'post'|'reader', id, name }
 
-  const totalPasscodes = readers.reduce((t, r) => t + r.passcodes.length, 0);
+  const totalPasscodes = readers.reduce((t, r) => t + (r.passcodeCount ?? 0), 0);
   const confirmedTrustedCount = trustedReaders.filter(
     (n) => confirmedReaders.some((c) => c.trim().toLowerCase() === n.trim().toLowerCase()),
   ).length;
@@ -407,7 +407,7 @@ function RecipientCard({ reader, onDelete }) {
               Passcode
             </p>
             <code className="rounded border border-[var(--amber-border)] bg-[var(--amber-subtle)] px-3 py-1.5 text-xs text-[var(--amber)] font-mono">
-              {reader.passcodesDisplay?.[0] ?? '••••••••'}
+              Not stored
             </code>
           </div>
           {reader.email && (

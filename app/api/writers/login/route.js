@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getDb, bcrypt, touchLastActive } from '../../../../lib/db.js';
+import { requireSameOrigin, setWriterSession } from '../../../../lib/auth.js';
+import { rateLimit } from '../../../../lib/rateLimit.js';
 
 export async function POST(request) {
+  const originError = requireSameOrigin(request);
+  if (originError) return originError;
+
+  const limited = await rateLimit(request, 'writer-login', { limit: 8, windowMs: 60_000 });
+  if (limited) return limited;
+
   const db = await getDb();
   const { email, password } = await request.json();
 
@@ -28,5 +36,7 @@ export async function POST(request) {
   // Reset inactivity timer on every login
   await touchLastActive(writer.id);
 
-  return NextResponse.json({ id: writer.id, name: writer.name, email: writer.email });
+  const response = NextResponse.json({ id: writer.id, name: writer.name, email: writer.email });
+  setWriterSession(response, writer);
+  return response;
 }

@@ -1,36 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Logo from './Logo.jsx';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/api';
 
-function getReaderPasscodeCount(readers, readerName) {
-  const match = readers.find(
-    (r) => r.readerName.toLowerCase() === readerName.trim().toLowerCase(),
-  );
-  return match ? (match.passcodeCount ?? 1) : 0;
-}
-
-export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onReaderUnlocked }) {
+export default function AuthPage({ onRegisterWriter, onLoginWriter, onReaderUnlocked }) {
   const [mode, setMode] = useState('reader');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [readerName, setReaderName] = useState('');
   const [readerPasscode, setReaderPasscode] = useState('');
-  const [confirmedPasscodes, setConfirmedPasscodes] = useState([]);
   const [error, setError] = useState('');
   const [pendingEmail, setPendingEmail] = useState(null); // set after registration, shows "check inbox"
   const [resendStatus, setResendStatus] = useState(''); // 'sent' | 'sending' | ''
   const [unverifiedEmail, setUnverifiedEmail] = useState(null); // set when login blocked due to unverified
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotStatus, setForgotStatus] = useState(''); // '' | 'sending' | 'sent'
-
-  const requiredCount = useMemo(
-    () => getReaderPasscodeCount(readers, readerName),
-    [readers, readerName],
-  );
-  const readerExists = readerName.trim() && requiredCount > 0;
-  const allReaderPasscodesPassed = readerExists && confirmedPasscodes.length === requiredCount;
 
   function changeMode(nextMode) {
     setMode(nextMode);
@@ -93,35 +78,22 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
       setError('Enter the recipient name given by the letter creator.');
       return;
     }
-    if (!readerExists) {
-      setError('No recipient profile was found for this name.');
-      return;
-    }
     const cleanPasscode = readerPasscode.trim();
     if (!cleanPasscode) {
       setError('Enter your passcode.');
       return;
     }
-    if (confirmedPasscodes.includes(cleanPasscode)) {
-      setError('This passcode is already confirmed.');
-      return;
-    }
-    const nextConfirmed = [...confirmedPasscodes, cleanPasscode];
-    setConfirmedPasscodes(nextConfirmed);
+    const message = await onReaderUnlocked(readerName.trim(), [cleanPasscode]);
     setReaderPasscode('');
-    setError('');
-    if (nextConfirmed.length === requiredCount) {
-      const message = await onReaderUnlocked(readerName.trim(), nextConfirmed);
-      if (message) {
-        setConfirmedPasscodes(confirmedPasscodes);
-        setError(message);
-      }
+    if (message) {
+      setError(message);
+    } else {
+      setError('');
     }
   }
 
   function resetReaderProgress(value) {
     setReaderName(value);
-    setConfirmedPasscodes([]);
     setReaderPasscode('');
     setError('');
   }
@@ -185,23 +157,12 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
             </ul>
           </div>
 
-          {/* Demo credentials */}
-          <div className="relative space-y-2">
-            <p className="eyebrow mb-3 opacity-60">Demo credentials</p>
-            <div className="rounded-lg border border-[rgba(232,168,76,0.1)] bg-[rgba(9,12,20,0.6)] p-4 space-y-2">
-              <p className="text-xs font-semibold text-[var(--parchment-70)]">Recipients</p>
-              <div className="space-y-1">
-                <p className="font-mono text-xs text-[var(--amber)] opacity-90">alice / alpha &nbsp;<span className="text-[var(--parchment-40)]">(keyholder)</span></p>
-                <p className="font-mono text-xs text-[var(--amber)] opacity-90">bob / beta &nbsp;<span className="text-[var(--parchment-40)]">(keyholder)</span></p>
-                <p className="font-mono text-xs text-[var(--amber)] opacity-90">sarah / gamma &nbsp;<span className="text-[var(--parchment-40)]">(beneficiary)</span></p>
-              </div>
-            </div>
-            <div className="rounded-lg border border-[rgba(232,168,76,0.1)] bg-[rgba(9,12,20,0.6)] p-4 space-y-1.5">
-              <p className="text-xs font-semibold text-[var(--parchment-70)]">Letter creator</p>
-              <p className="font-mono text-xs text-[var(--amber)] opacity-90">testator@example.com / writer123</p>
-            </div>
-          </div>
-        </aside>
+	          <div className="relative rounded-lg border border-[rgba(232,168,76,0.1)] bg-[rgba(9,12,20,0.6)] p-4">
+	            <p className="text-xs leading-relaxed text-[var(--parchment-40)]">
+	              Writers create recipients and share passcodes through their own trusted channel.
+	            </p>
+	          </div>
+	        </aside>
 
         {/* ── Right: Form panel ─────────────────────────── */}
         <section className="flex items-center justify-center bg-[rgba(7,9,14,0.6)] p-6 sm:p-12">
@@ -264,10 +225,9 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
                   <h2 className="text-2xl font-serif text-[var(--parchment)]">
                     Recipient access
                   </h2>
-                  <p className="text-xs leading-[1.7] text-[var(--parchment-40)]">
-                    Enter your name and confirm each passcode to access letter sections
-                    assigned to you.
-                  </p>
+	                  <p className="text-xs leading-[1.7] text-[var(--parchment-40)]">
+	                    Enter the recipient name and passcode provided by the letter creator.
+	                  </p>
                 </div>
 
                 <div className="space-y-4">
@@ -282,14 +242,7 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
                   </div>
 
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="eyebrow-dim">Passcode</label>
-                      {readerExists && (
-                        <span className="text-[10px] font-mono text-[var(--amber)] opacity-75">
-                          {confirmedPasscodes.length} / {requiredCount} confirmed
-                        </span>
-                      )}
-                    </div>
+	                    <label className="eyebrow-dim">Passcode</label>
                     <input
                       type="password"
                       value={readerPasscode}
@@ -300,26 +253,13 @@ export default function AuthPage({ readers, onRegisterWriter, onLoginWriter, onR
                   </div>
                 </div>
 
-                {confirmedPasscodes.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {confirmedPasscodes.map((_, i) => (
-                      <span
-                        key={i}
-                        className="rounded-full border border-[var(--jade-border)] bg-[var(--jade-bg)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--jade)]"
-                      >
-                        Key {i + 1} confirmed
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {error && <ErrorBanner>{error}</ErrorBanner>}
+	                {error && <ErrorBanner>{error}</ErrorBanner>}
 
                 <button
                   type="submit"
                   className="letter-btn-primary w-full px-4 py-3 text-sm"
                 >
-                  {allReaderPasscodesPassed ? 'Open letter sections →' : 'Confirm passcode'}
+	                  Open letter sections →
                 </button>
               </form>
             ) : forgotMode ? (

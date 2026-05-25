@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
-import { updateWriterAccount, createVerificationToken } from '../../../../../lib/db.js';
-import { sendEmail, buildVerificationEmail, buildEmailChangedEmail } from '../../../../../lib/email.js';
+import { updateWriterAccount } from '../../../../../lib/db.js';
+import { sendEmail, buildVerificationEmail } from '../../../../../lib/email.js';
+import { clearAuthCookies, requireSameOrigin, requireWriter } from '../../../../../lib/auth.js';
 
 export async function PATCH(request, { params }) {
+  const originError = requireSameOrigin(request);
+  if (originError) return originError;
+
   const { writerId } = await params;
+  const auth = await requireWriter(writerId);
+  if (auth.error) return auth.error;
+
   const { name, email, newPassword, currentPassword } = await request.json();
 
   if (!currentPassword) {
@@ -25,9 +32,11 @@ export async function PATCH(request, { params }) {
     await sendEmail({ to: result.newEmail, subject, html });
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     ok: true,
     emailChanged: result.emailChanged || false,
     name: result.name,
   });
+  if (result.emailChanged) clearAuthCookies(response);
+  return response;
 }

@@ -11,34 +11,13 @@ import AccountSettings from './components/AccountSettings.jsx';
 import ToastContainer, { useToast } from './components/Toast.jsx';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '/api';
-const SESSION_KEY = 'lastWillSession';
-const SESSION_COOKIE = 'last_will_session';
 
 function saveSession(session) {
-  const value = JSON.stringify(session);
-  window.localStorage.setItem(SESSION_KEY, value);
-  document.cookie = `${SESSION_COOKIE}=${encodeURIComponent(value)}; path=/; max-age=604800; SameSite=Lax`;
-}
-
-function readCookieSession() {
-  const cookie = document.cookie
-    .split('; ')
-    .find((item) => item.startsWith(`${SESSION_COOKIE}=`));
-
-  if (!cookie) {
-    return null;
-  }
-
-  return decodeURIComponent(cookie.split('=').slice(1).join('='));
-}
-
-function readSavedSession() {
-  return window.localStorage.getItem(SESSION_KEY) || readCookieSession();
+  return session;
 }
 
 function clearSession() {
-  window.localStorage.removeItem(SESSION_KEY);
-  document.cookie = `${SESSION_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+  return null;
 }
 
 async function apiRequest(path, options = {}) {
@@ -88,33 +67,25 @@ export default function App() {
   }, []);
 
   async function restoreSession() {
-    const savedSession = readSavedSession();
-
-    if (!savedSession) {
-      await loadPublicRecipients();
-      return;
-    }
-
     try {
       setIsLoading(true);
-      const session = JSON.parse(savedSession);
+      const session = await apiRequest('/session');
 
-      if (session.type === 'writer' && session.writer) {
+      if (session.type === 'writer') {
         setCurrentWriter(session.writer);
         setReaderSession(null);
         await loadWriterData(session.writer.id);
-        setPage(session.page || 'writer-dashboard');
+        setPage('writer-dashboard');
         setAppError('');
         return;
       }
 
       if (session.type === 'recipient' && session.readerName) {
-        const data = await apiRequest(`/recipients/${session.readerName}/sections`);
-        setPosts(data.posts);
-        setConfirmedReaders(data.confirmedReaders);
-        setTrustedReaders(data.trustedReaders || []);
-        setUnlockThreshold(data.unlockThreshold || 0);
-        setDmzUnlocked(data.dmzUnlocked || false);
+        setPosts(session.posts);
+        setConfirmedReaders(session.confirmedReaders);
+        setTrustedReaders(session.trustedReaders || []);
+        setUnlockThreshold(session.unlockThreshold || 0);
+        setDmzUnlocked(session.dmzUnlocked || false);
         setReaderSession({ readerName: session.readerName });
         setCurrentWriter(null);
         setPage('reader-portal');
@@ -122,11 +93,8 @@ export default function App() {
         return;
       }
 
-      clearSession();
       await loadPublicRecipients();
     } catch (error) {
-      clearSession();
-      setAppError(error.message);
       await loadPublicRecipients();
     } finally {
       setIsLoading(false);
@@ -162,6 +130,7 @@ export default function App() {
       setIsLoading(true);
       await apiRequest('/writers/reset-confirmations', {
         method: 'POST',
+        body: JSON.stringify({ writerId: currentWriter.id }),
       });
       if (currentWriter) {
         await loadWriterData(currentWriter.id);
@@ -238,6 +207,11 @@ export default function App() {
   }
 
   async function logout() {
+    try {
+      await apiRequest('/writers/logout', { method: 'POST' });
+    } catch {
+      // Local logout should still complete if the server session has already expired.
+    }
     setCurrentWriter(null);
     setReaderSession(null);
     setPosts([]);

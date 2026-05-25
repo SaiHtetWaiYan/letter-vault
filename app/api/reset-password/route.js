@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getWriterByResetToken, resetPasswordByToken } from '../../../lib/db.js';
+import { escapeHtml } from '../../../lib/sanitize.js';
+import { rateLimit } from '../../../lib/rateLimit.js';
+import { requireSameOrigin } from '../../../lib/auth.js';
 
 const BASE = process.env.NEXT_PUBLIC_BASE_URL || 'https://letter-vault.saihtet.dev';
 
@@ -19,6 +22,12 @@ export async function GET(request) {
 
 // POST — handle the form submission
 export async function POST(request) {
+  const originError = requireSameOrigin(request);
+  if (originError) return originError;
+
+  const limited = await rateLimit(request, 'reset-password', { limit: 8, windowMs: 60_000 });
+  if (limited) return limited;
+
   const body = await request.formData();
   const token = body.get('token');
   const password = body.get('password');
@@ -74,16 +83,16 @@ function formPage(token, errorMsg = '') {
     <div class="brand">Letter Vault</div><hr/>
     <h1>Reset your password</h1>
     <p>Choose a new password for your account. Must be at least 8 characters.</p>
-    ${errorMsg ? `<div class="error">${errorMsg}</div>` : ''}
+    ${errorMsg ? `<div class="error">${escapeHtml(errorMsg)}</div>` : ''}
     <form method="POST" action="/api/reset-password">
-      <input type="hidden" name="token" value="${token}"/>
+      <input type="hidden" name="token" value="${escapeHtml(token)}"/>
       <label>New password</label>
       <input type="password" name="password" placeholder="At least 8 characters" required minlength="8" autofocus/>
       <label>Confirm password</label>
       <input type="password" name="confirm" placeholder="Repeat your new password" required/>
       <button type="submit">Set new password →</button>
     </form>
-    <a class="back" href="${BASE}">← Back to Letter Vault</a>
+    <a class="back" href="${escapeHtml(BASE)}">← Back to Letter Vault</a>
   `);
 }
 
@@ -92,15 +101,15 @@ function successPage() {
     <div class="icon">✓</div>
     <h1 style="text-align:center;color:#e8a84c">Password updated</h1>
     <p style="text-align:center">Your password has been reset. You can now sign in with your new password.</p>
-    <a href="${BASE}" style="display:block;text-align:center;background:#e8a84c;color:#1a1209;padding:13px;border-radius:6px;font-weight:bold;text-decoration:none">Sign in →</a>
+    <a href="${escapeHtml(BASE)}" style="display:block;text-align:center;background:#e8a84c;color:#1a1209;padding:13px;border-radius:6px;font-weight:bold;text-decoration:none">Sign in →</a>
   `);
 }
 
 function errorPage(title, message) {
   return shell(`
     <div class="icon" style="color:#e87070">✕</div>
-    <h1 style="text-align:center;color:#e87070">${title}</h1>
-    <p style="text-align:center">${message}</p>
-    <a href="${BASE}" style="display:block;text-align:center;background:#e8a84c;color:#1a1209;padding:13px;border-radius:6px;font-weight:bold;text-decoration:none">Back to Letter Vault</a>
+    <h1 style="text-align:center;color:#e87070">${escapeHtml(title)}</h1>
+    <p style="text-align:center">${escapeHtml(message)}</p>
+    <a href="${escapeHtml(BASE)}" style="display:block;text-align:center;background:#e8a84c;color:#1a1209;padding:13px;border-radius:6px;font-weight:bold;text-decoration:none">Back to Letter Vault</a>
   `);
 }

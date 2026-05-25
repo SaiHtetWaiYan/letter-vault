@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyEmailToken } from '../../../lib/db.js';
+import { escapeHtml } from '../../../lib/sanitize.js';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -35,12 +36,15 @@ export async function GET(request) {
 function page(title, message, ok) {
   const color = ok ? '#e8a84c' : '#c0392b';
   const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://letter-vault.saihtet.dev';
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
+  const safeBase = escapeHtml(base);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>${title} — Letter Vault</title>
+	  <title>${safeTitle} — Letter Vault</title>
   <style>
     body{font-family:Georgia,serif;background:#0d0d07;color:#e8d9b0;min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0;padding:24px}
     .card{max-width:480px;width:100%;text-align:center;padding:48px 32px;border:1px solid rgba(232,168,76,0.15);border-radius:12px;background:#141408}
@@ -53,9 +57,9 @@ function page(title, message, ok) {
 <body>
   <div class="card">
     <div class="icon">${ok ? '✓' : '✕'}</div>
-    <h1>${title}</h1>
-    <p>${message}</p>
-    <a href="${base}">Go to Letter Vault</a>
+	    <h1>${safeTitle}</h1>
+	    <p>${safeMessage}</p>
+	    <a href="${safeBase}">Go to Letter Vault</a>
   </div>
 </body>
 </html>`;

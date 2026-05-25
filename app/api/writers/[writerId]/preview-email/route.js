@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getDb, decrypt } from '../../../../../lib/db.js';
 import { sendEmail, buildPreviewEmail } from '../../../../../lib/email.js';
+import { requireSameOrigin, requireWriter } from '../../../../../lib/auth.js';
+import { sanitizeHtml } from '../../../../../lib/sanitize.js';
 
 export async function POST(request, { params }) {
+  const originError = requireSameOrigin(request);
+  if (originError) return originError;
+
   const { writerId } = await params;
+  const auth = await requireWriter(writerId);
+  if (auth.error) return auth.error;
+
   const { sectionId } = await request.json();
 
   const db = await getDb();
@@ -20,7 +28,7 @@ export async function POST(request, { params }) {
   const { subject, html } = buildPreviewEmail({
     writerName: writer.name,
     sectionTitle: section.title,
-    sectionText: decrypt(section.text),
+    sectionText: sanitizeHtml(decrypt(section.text)),
   });
 
   await sendEmail({ to: writer.email, subject, html });

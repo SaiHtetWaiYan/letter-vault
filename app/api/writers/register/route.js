@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createId, getDb, bcrypt, SALT_ROUNDS, createVerificationToken } from '../../../../lib/db.js';
 import { sendEmail, buildVerificationEmail } from '../../../../lib/email.js';
+import { rateLimit } from '../../../../lib/rateLimit.js';
+import { requireSameOrigin } from '../../../../lib/auth.js';
 
 export async function POST(request) {
+  const originError = requireSameOrigin(request);
+  if (originError) return originError;
+
+  const limited = await rateLimit(request, 'writer-register', { limit: 5, windowMs: 60_000 });
+  if (limited) return limited;
+
   const db = await getDb();
   const { name, email, password } = await request.json();
 
