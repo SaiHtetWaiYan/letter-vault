@@ -1,7 +1,26 @@
 import { NextResponse } from 'next/server';
 import { sendEmail } from '../../../lib/email.js';
+import { getWriterSession, requireSameOrigin } from '../../../lib/auth.js';
+import { rateLimit } from '../../../lib/rateLimit.js';
+import { escapeHtml } from '../../../lib/sanitize.js';
 
 export async function POST(request) {
+  // Only allow in development
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ message: 'Not available in production.' }, { status: 403 });
+  }
+
+  const originError = requireSameOrigin(request);
+  if (originError) return originError;
+
+  const limited = await rateLimit(request, 'test-email', { limit: 5, windowMs: 60_000 });
+  if (limited) return limited;
+
+  const session = await getWriterSession();
+  if (!session || session.type !== 'writer') {
+    return NextResponse.json({ message: 'Please sign in again.' }, { status: 401 });
+  }
+
   const { to } = await request.json();
 
   if (!to) {
@@ -18,7 +37,7 @@ export async function POST(request) {
   <h2 style="margin:0 0 12px">SMTP is working ✓</h2>
   <p>This is a test email sent from your Letter Vault instance.</p>
   <p>Dead-man's switch warning and unlock emails will be delivered successfully.</p>
-  <p style="font-size:12px;color:#888;margin-top:32px">Sent from: ${process.env.SMTP_HOST}</p>
+	  <p style="font-size:12px;color:#888;margin-top:32px">Sent from: ${escapeHtml(process.env.SMTP_HOST)}</p>
 </div>`,
   });
 

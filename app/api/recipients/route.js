@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllRecipients } from '../../../lib/db.js';
 
 export async function GET() {
-  return NextResponse.json(await getAllRecipients());
+  return NextResponse.json({ message: 'Not found.' }, { status: 404 });
 }

@@ -15,6 +15,10 @@ export default function CreateReaderForm({ onSave, onCancel }) {
       setError('Please enter a recipient name and a passcode.');
       return;
     }
+    if (cleanPasscode.length < 4) {
+      setError('Passcode must be at least 4 characters.');
+      return;
+    }
     const message = onSave({ readerName: cleanName, passcodes: [cleanPasscode], isTrusted, email: email.trim() || undefined });
     setError(message);
   }

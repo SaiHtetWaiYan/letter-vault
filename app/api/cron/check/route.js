@@ -9,6 +9,7 @@ import {
   getSectionRecipients,
   applyRelativeReleaseDates,
   getVaultUnlockStatus,
+  createHeartbeatToken,
 } from '../../../../lib/db.js';
 import {
   sendEmail,
@@ -19,7 +20,7 @@ import {
 
 function isAuthorised(request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  if (!secret) return false;
   const auth = request.headers.get('authorization') || '';
   return auth === `Bearer ${secret}`;
 }
@@ -28,6 +29,11 @@ export async function POST(request) {
   if (!isAuthorised(request)) {
     return NextResponse.json({ message: 'Unauthorised' }, { status: 401 });
   }
+
+  // Prevent abuse even with valid secret — max 5 calls per minute
+  const { rateLimit } = await import('../../../../lib/rateLimit.js');
+  const limited = await rateLimit(request, 'cron-check', { limit: 5, windowMs: 60_000 });
+  if (limited) return limited;
 
   const now = new Date();
   const results = { warned: [], unlocked: [], skipped: [], sectionsReleased: [] };
@@ -77,9 +83,10 @@ export async function POST(request) {
     }
 
     if (inactiveSince >= inactivityMs) {
+      const heartbeatToken = await createHeartbeatToken(writer.id);
       const { subject, html } = buildWarningEmail({
         writerName: writer.name,
-        heartbeatToken: writer.heartbeat_token,
+        heartbeatToken,
         graceDays: writer.grace_days,
       });
       await sendEmail({ to: writer.email, subject, html });

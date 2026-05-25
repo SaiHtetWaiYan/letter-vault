@@ -1,15 +1,30 @@
 import { NextResponse } from 'next/server';
-import { createId, getDb, getWriterData, bcrypt, SALT_ROUNDS, encrypt } from '../../../../../lib/db.js';
+import { createId, getDb, getWriterData, bcrypt, SALT_ROUNDS } from '../../../../../lib/db.js';
 import { sendEmail, buildRecipientInviteEmail } from '../../../../../lib/email.js';
+import { requireSameOrigin, requireWriter } from '../../../../../lib/auth.js';
 
 export async function POST(request, { params }) {
+  const originError = requireSameOrigin(request);
+  if (originError) return originError;
+
   const db = await getDb();
   const { writerId } = await params;
+  const auth = await requireWriter(writerId);
+  if (auth.error) return auth.error;
+
   const { readerName, passcodes, isTrusted, email } = await request.json();
 
   if (!readerName || !Array.isArray(passcodes) || passcodes.length === 0) {
     return NextResponse.json(
       { message: 'Recipient name and passcodes are required.' },
+      { status: 400 },
+    );
+  }
+
+  const shortPasscode = passcodes.find((p) => String(p || '').length < 4);
+  if (shortPasscode !== undefined) {
+    return NextResponse.json(
+      { message: 'Each passcode must be at least 4 characters.' },
       { status: 400 },
     );
   }
@@ -21,10 +36,10 @@ export async function POST(request, { params }) {
     await db.run(
       'INSERT INTO recipients (id, writer_id, reader_name, passcodes, passcodes_display, is_trusted, email) VALUES (?, ?, ?, ?, ?, ?, ?)',
       createId(),
-      writerId,
-      readerName,
-      JSON.stringify(hashedPasscodes),
-      encrypt(JSON.stringify(passcodes)),
+	      writerId,
+	      readerName,
+	      JSON.stringify(hashedPasscodes),
+	      null,
       isTrusted ? 1 : 0,
       email || null,
     );
@@ -36,9 +51,8 @@ export async function POST(request, { params }) {
         const { subject, html } = buildRecipientInviteEmail({
           writerName: writer.name,
           readerName,
-          passcode: passcodes[0], // send the plain passcode before it's hashed
-          isTrusted: Boolean(isTrusted),
-        });
+	          isTrusted: Boolean(isTrusted),
+	        });
         await sendEmail({ to: email, subject, html });
       }
     }
