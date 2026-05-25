@@ -17,5 +17,5 @@ export async function GET() {
     return NextResponse.json({ type: 'recipient', readerName: readerSession.readerName, ...data });
   }
 
-  return NextResponse.json({ type: null }, { status: 401 });
+  return NextResponse.json({ type: null });
 }
