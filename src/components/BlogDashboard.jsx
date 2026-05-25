@@ -458,18 +458,24 @@ function AttachmentRow({ file }) {
 function DeadManControl({ dms, dmzUnlocked, onSave }) {
   const [inactivityDays, setInactivityDays] = useState(dms?.inactivityDays ?? 90);
   const [graceDays, setGraceDays] = useState(dms?.graceDays ?? 30);
+  const [keyholderGraceDays, setKeyholderGraceDays] = useState(dms?.keyholderGraceDays ?? 14);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
     setInactivityDays(dms?.inactivityDays ?? 90);
     setGraceDays(dms?.graceDays ?? 30);
+    setKeyholderGraceDays(dms?.keyholderGraceDays ?? 14);
   }, [dms]);
 
   async function handleSave() {
     setSaving(true);
     setMsg('');
-    const err = await onSave({ inactivityDays: Number(inactivityDays), graceDays: Number(graceDays) });
+    const err = await onSave({
+      inactivityDays: Number(inactivityDays),
+      graceDays: Number(graceDays),
+      keyholderGraceDays: Number(keyholderGraceDays),
+    });
     setSaving(false);
     setMsg(err || 'Saved.');
   }
@@ -532,7 +538,7 @@ function DeadManControl({ dms, dmzUnlocked, onSave }) {
               days of inactivity
             </label>
             <label className="text-xs text-[var(--parchment-70)] flex items-center gap-2">
-              Auto-unlock after
+              Notify keyholders after
               <input
                 type="number"
                 min={1}
@@ -542,6 +548,18 @@ function DeadManControl({ dms, dmzUnlocked, onSave }) {
                 className="w-16 rounded border border-[var(--amber-border)] bg-[var(--ink-2)] px-2 py-1 text-sm text-[var(--parchment)] font-mono"
               />
               more days
+            </label>
+            <label className="text-xs text-[var(--parchment-70)] flex items-center gap-2">
+              Force-unlock after
+              <input
+                type="number"
+                min={1}
+                max={365}
+                value={keyholderGraceDays}
+                onChange={(e) => setKeyholderGraceDays(e.target.value)}
+                className="w-16 rounded border border-[var(--amber-border)] bg-[var(--ink-2)] px-2 py-1 text-sm text-[var(--parchment)] font-mono"
+              />
+              more days if keyholders silent
             </label>
             <button
               onClick={handleSave}
@@ -553,8 +571,9 @@ function DeadManControl({ dms, dmzUnlocked, onSave }) {
           </div>
           <p className="text-[11px] text-[var(--parchment-40)] leading-relaxed">
             If you don't log in for <strong className="text-[var(--parchment-70)]">{inactivityDays} days</strong>, we'll email you a check-in link.
-            If you don't respond within <strong className="text-[var(--parchment-70)]">{graceDays} more days</strong>, the vault opens automatically
-            and your letters are delivered. Logging in at any time resets the timer.
+            If you don't respond within <strong className="text-[var(--parchment-70)]">{graceDays} more days</strong>, your keyholders are notified to unlock the vault.
+            If keyholders don't confirm within <strong className="text-[var(--parchment-70)]">{keyholderGraceDays} days</strong> after that, the vault opens automatically.
+            Logging in at any time resets the timer.
           </p>
           {msg && <p className="text-[11px] text-[var(--amber)]">{msg}</p>}
         </div>

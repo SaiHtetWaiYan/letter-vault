@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { findRecipientByPasscodes, getRecipientSections, getVaultUnlockStatus, getWriterRecipients, confirmRecipient, getDb } from '../../../../lib/db.js';
+import { findRecipientByPasscodes, getRecipientSections, getVaultUnlockStatus, getWriterRecipients, confirmRecipient, clearKeyholdersNotified, getDb } from '../../../../lib/db.js';
 import { sendEmail, buildRecipientUnlockEmail } from '../../../../lib/email.js';
 import { requireSameOrigin, setReaderSession } from '../../../../lib/auth.js';
 import { rateLimit } from '../../../../lib/rateLimit.js';
@@ -39,6 +39,8 @@ export async function POST(request) {
   if (!before.isUnlocked) {
     const after = await getVaultUnlockStatus(writerId);
     if (after.isUnlocked) {
+      // Clear the keyholder-notification flag so cron stops tracking
+      await clearKeyholdersNotified(writerId);
       await notifyAllRecipients(writerId);
     }
   }

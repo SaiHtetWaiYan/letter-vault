@@ -10,18 +10,19 @@ export async function PATCH(request, { params }) {
   const auth = await requireWriter(writerId);
   if (auth.error) return auth.error;
 
-  const { inactivityDays, graceDays } = await request.json();
+  const { inactivityDays, graceDays, keyholderGraceDays } = await request.json();
 
   if (
     !Number.isInteger(inactivityDays) || inactivityDays < 1 ||
-    !Number.isInteger(graceDays) || graceDays < 1
+    !Number.isInteger(graceDays) || graceDays < 1 ||
+    (keyholderGraceDays != null && (!Number.isInteger(keyholderGraceDays) || keyholderGraceDays < 1))
   ) {
     return NextResponse.json(
-      { message: 'inactivityDays and graceDays must be positive integers.' },
+      { message: 'inactivityDays, graceDays and keyholderGraceDays must be positive integers.' },
       { status: 400 },
     );
   }
 
-  await setDmsConfig(writerId, { inactivityDays, graceDays });
+  await setDmsConfig(writerId, { inactivityDays, graceDays, keyholderGraceDays });
   return NextResponse.json(await getWriterData(writerId));
 }
